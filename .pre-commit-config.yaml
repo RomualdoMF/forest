@@ -1,0 +1,35 @@
+repos:
+  - repo: local
+    hooks:
+      - id: docs_readme
+        name: docs_readme
+        entry: parse_docs -p docs -e .md -s 01_brief_description 02_introduction 03_compute_requirements 04_install_and_run 05_related_protocols 06_input_example 07_pipeline_overview 08_input_parameters 09_outputs 10_troubleshooting 11_FAQ 12_other -ot README.md -od output_definition.json -ns nextflow_schema.json
+        language: python
+        always_run: true
+        pass_filenames: false
+        additional_dependencies:
+          - epi2melabs==0.0.59
+  - repo: https://github.com/pycqa/flake8
+    rev: 5.0.4
+    hooks:
+      - id: flake8
+        pass_filenames: false
+        additional_dependencies:
+          - flake8-rst-docstrings
+          - flake8-docstrings
+          - flake8-import-order
+          - flake8-forbid-visual-indent
+          - pep8-naming
+          - flake8-no-types
+          - flake8-builtins
+          - flake8-absolute-import
+          - flake8-print
+          # avoid snowballstemmer>=3.0 as it causes flake8-docstrings to stop working [CW-6098]
+          - snowballstemmer==2.2.0
+        args: [
+            "bin",
+            "--import-order-style=google",
+            "--statistics",
+            "--max-line-length=88",
+            "--per-file-ignores=bin/workflow_glue/models/*:NT001",
+        ]

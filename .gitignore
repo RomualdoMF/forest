@@ -1,0 +1,8 @@
+nextflow
+.nextflow*
+template-workflow
+.*.swp
+.*.swo
+*.pyc
+*.pyo
+.DS_store
