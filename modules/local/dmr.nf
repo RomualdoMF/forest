@@ -20,7 +20,7 @@
 // vendored into this repo (~73MB tarball, committed directly in the upstream repo with
 // no separate stable download URL) -- it's fetched once from a pinned upstream commit
 // into params.dmr_annotations_dir, same idempotent/mkdir-lock pattern as
-// download_vep_cache/download_annotsv_annotations.
+// download_annotsv_annotations.
 file(params.dmr_annotations_dir).mkdirs()
 
 

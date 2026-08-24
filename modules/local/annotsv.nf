@@ -32,7 +32,7 @@ file(params.annotsv_annotations_dir).mkdirs()
 process download_annotsv_annotations {
     // ensures params.annotsv_annotations_dir/Annotations_Human exists, downloading
     // it from the AnnotSV authors' server if missing. Same idempotent/lockable
-    // approach as download_vep_cache in modules/local/vep.nf.
+    // mkdir-lock approach used by download_dmr_annotations in modules/local/dmr.nf.
     label "annotsv"
     cpus 1
     memory 2.GB
@@ -65,7 +65,7 @@ process run_annotsv {
     // ranks/annotates structural variants; produces AnnotSV's native TSV output.
     // Skipped for genomes other than hg19/hg38 (AnnotSV also supports CHM13/mm9/
     // mm10, not wired up here since the rest of the pipeline only handles
-    // hg19/hg38 -- see run_vep in modules/local/vep.nf for the same convention).
+    // hg19/hg38 -- see run_fastvep in modules/local/vep.nf for the same convention).
     // no publishDir here: the TSV flows into the `report`/artifacts channel in
     // workflows/wf-human-sv.nf and wf-human-cnv.nf, published once via
     // output_sv/output_cnv (same convention as the rest of those outputs, e.g.

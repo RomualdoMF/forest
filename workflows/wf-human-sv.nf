@@ -11,7 +11,8 @@ include {
     truvari;
 } from "../modules/local/wf-human-sv-eval.nf"
 include {
-    haploblocks as haploblocks_sv
+    haploblocks as haploblocks_sv;
+    normalize_vcf as normalize_sv_vcf
 } from '../modules/local/common.nf'
 include {
     annotate_vcf as annotate_sv_vcf
@@ -34,46 +35,56 @@ workflow bam {
     main:
         called = variantCall(bam_channel, reference, target, mosdepth_stats, optional_file, genome_build, chromosome_codes)
 
+        // bcftools norm -m -any: splits multiallelic records and left-aligns
+        // indels, same treatment normalize_vcf gives the SNP VCF (see
+        // modules/local/common.nf) -- this becomes the always-published
+        // <alias>.wf_sv.vcf.gz, independent of --annotation, so the annotated
+        // output below (<alias>.wf_sv.annotated.vcf.gz) never shadows it under
+        // the same filename.
+        normalized = normalize_sv_vcf(reference.collect(), called.vcf.join(called.vcf_index), "sv").normalized_vcf
+
         // benchmark
         if (params.sv_benchmark) {
-            maybe_benchmark_result = runBenchmark(called.vcf, reference, target)
+            maybe_benchmark_result = runBenchmark(normalized.map{meta, vcf, tbi -> [meta, vcf]}, reference, target)
         }
         else {
             maybe_benchmark_result = Channel.empty()
         }
 
         if (!params.annotation) {
-            final_vcf = called.vcf.join(called.vcf_index)
+            annotated_vcf = Channel.empty()
             annotsv_tsv = Channel.empty()
-            annotsv_vcf = Channel.empty()
 
             report = runReport(
-                called.vcf.groupTuple(),
+                normalized.map{meta, vcf, tbi -> [meta, vcf]}.groupTuple(),
                 maybe_benchmark_result.ifEmpty(optional_file),
                 workflow_params
             )
         }
         else {
             // append '*' to indicate that annotation should be performed on all chr at once
-            vcf_for_annotation = called.vcf.join(called.vcf_index).map{ it << '*' }
-            // annotate with VEP
-            final_vcf = annotate_sv_vcf(vcf_for_annotation, genome_build, "sv").annot_vcf
+            vcf_for_annotation = normalized.map{ it << '*' }
+            // annotate with fastVEP -- <alias>.wf_sv.annotated.vcf.gz
+            fastvep_vcf = annotate_sv_vcf(vcf_for_annotation, genome_build, "sv.annotated", reference.collect()).annot_vcf
 
             // optionally rank/annotate the SVs further with AnnotSV, and (on
-            // top of that) write AnnotSV's own columns back into the VCF as
-            // INFO fields, producing .wf_sv.annotated.vcf.gz
+            // top of that) write AnnotSV's own columns back into fastvep_vcf as
+            // more INFO fields -- annotate_vcf_with_tsv reads fastvep_vcf and
+            // rewrites it under the SAME <alias>.wf_sv.annotated.vcf.gz name
+            // (not a separate file), so that filename always ends up being
+            // "whatever annotation --annotation/--annotsv turned on", never two
+            // competing files publishing under it.
             if (params.annotsv) {
-                annotsv_result = annotsv(final_vcf, genome_build, "sv").annotsv_tsv
+                annotsv_result = annotsv(fastvep_vcf, genome_build, "sv").annotsv_tsv
                 annotsv_tsv = annotsv_result.map{ meta, tsv -> tsv }
-                annotsv_vcf = annotate_vcf_with_tsv(annotsv_result, final_vcf, "sv").annotated_vcf
-                    .map{ meta, vcf, tbi -> [vcf, tbi] }
+                annotated_vcf = annotate_vcf_with_tsv(annotsv_result, fastvep_vcf, "sv").annotated_vcf
             } else {
                 annotsv_tsv = Channel.empty()
-                annotsv_vcf = Channel.empty()
+                annotated_vcf = fastvep_vcf
             }
 
             report = runReport(
-                final_vcf.map{meta, vcf, tbi -> [meta, vcf]}.groupTuple(),
+                annotated_vcf.map{meta, vcf, tbi -> [meta, vcf]}.groupTuple(),
                 maybe_benchmark_result.ifEmpty(optional_file),
                 workflow_params
             )
@@ -82,17 +93,17 @@ workflow bam {
         // Prepare stuff to emit
         sv_stats_json = report.json
         report = report.html.concat(
-            final_vcf.map{meta, vcf, tbi -> [vcf, tbi]},
+            normalized.map{meta, vcf, tbi -> [vcf, tbi]},
+            annotated_vcf.map{meta, vcf, tbi -> [vcf, tbi]},
             maybe_benchmark_result,
-            annotsv_tsv,
-            annotsv_vcf
+            annotsv_tsv
         )
-    
+
     emit:
         report = report
         sv_stats_json = sv_stats_json
         sniffles_vcf = called.vcf
-        for_phasing = final_vcf
+        for_phasing = params.annotation ? annotated_vcf : normalized
 }
 
 

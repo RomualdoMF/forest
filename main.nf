@@ -36,7 +36,7 @@ include {
     downsampling;
     concat_vcfs as concat_snp_vcfs;
     concat_vcfs as concat_refined_snp;
-    normalize_snp_vcf;
+    normalize_vcf as normalize_snp_vcf;
     bed_filter;
     sanitise_bed;
     sanitise_bed as sanitise_coverage_bed;
@@ -859,15 +859,16 @@ workflow {
             // bcftools norm -m- splits multiallelic records (and left-aligns indels)
             // before anything downstream touches the SNP VCF -- VEP's own per-transcript
             // CSQ blocks cope with multiallelic records fine, but TAPES doesn't (see
-            // normalize_snp_vcf in modules/local/common.nf for the full story). This
+            // normalize_vcf in modules/local/common.nf for the full story). This
             // normalized VCF is what gets published as wf_snp.vcf.gz now; the
             // VEP/TAPES-annotated one below is wf_snp.annotated.vcf.gz instead.
-            snp_vcf = normalize_snp_vcf(ref_channel.collect(), final_snp_vcf_filtered).normalized_vcf
+            snp_vcf = normalize_snp_vcf(ref_channel.collect(), final_snp_vcf_filtered, "snp").normalized_vcf
 
-            // do annotation (functional consequences + ClinVar, both via VEP)
-            // snpeff is slow so we'll just pass the whole VCF but annotate per contig
+            // do annotation (functional consequences + supplementary annotation +
+            // ACMG classification, all via fastVEP) -- annotate per contig for
+            // parallelism, same as the VEP step this replaces
             annotations = annotate_snp_vcf(
-                snp_vcf.combine(clair_vcf.contigs), genome_build.first(), "snp"
+                snp_vcf.combine(clair_vcf.contigs), genome_build.first(), "snp", ref_channel.collect()
             )
             vep_annotated_vcf = concat_snp_vcfs(annotations.map{ meta, vcf, tbi -> [meta,vcf]}.groupTuple(), "wf_snp.annotated").final_vcf
 

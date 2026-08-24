@@ -429,35 +429,42 @@ process concat_vcfs {
 }
 
 
-process normalize_snp_vcf {
+process normalize_vcf {
     // bcftools norm -m -any: splits multiallelic records into one record per ALT
     // allele and left-aligns indels against the reference, before any downstream
-    // annotation touches the SNP VCF. VEP's own per-transcript CSQ blocks already
-    // cope with multiallelic records fine, but per-record consumers further
-    // downstream don't -- TAPES in particular: its own decompose-multiallelics code
-    // path (tapes.py's test_if_decomposed, gated by sampling just the input's first
-    // 2000 lines) never actually triggered on this pipeline's real per-contig SNP
-    // VCFs, so every multiallelic record's ALT list came back from TAPES still
-    // comma-joined, unsplit -- see bin/annotate_vcf_with_tapes.py. Runs on the
-    // pre-annotation SNP VCF so VEP, TAPES and everything else downstream all see
-    // one allele per record; this becomes the published ${sample}.wf_snp.vcf.gz
-    // (the VEP+TAPES-annotated file is ${sample}.wf_snp.annotated.vcf.gz instead --
-    // see concat_snp_vcfs/annotate_snp_vcf_with_tapes in main.nf/modules/local/tapes.nf).
+    // annotation touches the VCF. VEP/fastVEP's own per-transcript CSQ blocks
+    // already cope with multiallelic records fine, but per-record consumers
+    // further downstream don't -- TAPES in particular (SNP path): its own
+    // decompose-multiallelics code path (tapes.py's test_if_decomposed, gated by
+    // sampling just the input's first 2000 lines) never actually triggered on
+    // this pipeline's real per-contig SNP VCFs, so every multiallelic record's
+    // ALT list came back from TAPES still comma-joined, unsplit -- see
+    // bin/annotate_vcf_with_tapes.py. Runs on the pre-annotation VCF (SNP/SV/CNV
+    // all call this the same way) so annotation and everything else downstream
+    // sees one allele per record; this becomes the published
+    // ${sample}.wf_${output_label}.vcf.gz -- the fastVEP-annotated file is
+    // ${sample}.wf_${output_label}.annotated.vcf.gz instead (see
+    // concat_snp_vcfs/annotate_snp_vcf_with_tapes in main.nf/modules/local/tapes.nf
+    // for SNP, or the `annotate_vcf` calls in workflows/wf-human-sv.nf /
+    // wf-human-cnv.nf for SV/CNV), so the raw and annotated files never collide
+    // on the same output filename regardless of --annotation.
     cpus 2
     memory 4.GB
     input:
         tuple path(ref), path(ref_idx), path(ref_cache), env(REF_PATH)
-        // stageAs on the input: its upstream name is already ${alias}.wf_snp.vcf.gz
-        // (same as this process' own output below) -- staging it under a distinct
-        // name avoids bcftools reading and truncating the same path at once (seen
-        // for real: "Failed to read BGZF block data", 0 records survived).
+        // stageAs on the input: its upstream name can already be
+        // ${alias}.wf_${output_label}.vcf.gz (same as this process' own output
+        // below) -- staging it under a distinct name avoids bcftools reading and
+        // truncating the same path at once (seen for real on the SNP path:
+        // "Failed to read BGZF block data", 0 records survived).
         tuple val(xam_meta), path(vcf, stageAs: "input.vcf.gz"), path(tbi, stageAs: "input.vcf.gz.tbi")
+        val(output_label)  // "snp" / "sv" / "cnv"
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_snp.vcf.gz"), path("${xam_meta.alias}.wf_snp.vcf.gz.tbi"), emit: normalized_vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.wf_${output_label}.vcf.gz"), path("${xam_meta.alias}.wf_${output_label}.vcf.gz.tbi"), emit: normalized_vcf
     script:
         """
-        bcftools norm -m -any -f ${ref} -O z -o ${xam_meta.alias}.wf_snp.vcf.gz ${vcf}
-        tabix -p vcf ${xam_meta.alias}.wf_snp.vcf.gz
+        bcftools norm -m -any -f ${ref} -O z -o ${xam_meta.alias}.wf_${output_label}.vcf.gz ${vcf}
+        tabix -p vcf ${xam_meta.alias}.wf_${output_label}.vcf.gz
         """
 }
 
