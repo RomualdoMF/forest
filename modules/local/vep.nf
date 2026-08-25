@@ -2,11 +2,12 @@
 // annotation, replacing Ensembl VEP.
 //
 // Design notes:
-// - The fastvep image does not ship bcftools, so contig splitting (see
-//   prepare_annotation_input) is done in the default pipeline container (which
-//   already carries bcftools/tabix, see concat_vcfs in modules/local/common.nf),
-//   and only the actual `fastvep annotate` call runs inside the
-//   fastvep_annotation-labelled container.
+// - The fastvep image does not ship bcftools or htslib (bgzip/tabix), so
+//   contig splitting (see prepare_annotation_input) and compressing/indexing
+//   the annotated output (see compress_annotated_vcf) both run in the
+//   pipeline's default container (which already carries bcftools/tabix, see
+//   concat_vcfs in modules/local/common.nf) -- only the actual `fastvep
+//   annotate` call runs inside the fastvep_annotation-labelled container.
 // - `--gff3`/`--sa-dir` point at externally-prepared fastVEP cache data (gene
 //   models + supplementary annotation .osa/.osa2 databases, see
 //   params.fastvep_gff3/fastvep_sa_dir in nextflow.config) -- large, shared,
@@ -21,8 +22,10 @@
 //   main.nf) rather than a separate fastvep-specific param -- it's staged into
 //   the task work dir like any other Nextflow input, no bind mount needed.
 // - fastvep writes plain text regardless of the `--output` file's extension
-//   (no bgzip writer of its own, unlike VEP) -- bgzip/tabix it ourselves after
-//   (see run_fastvep).
+//   (no bgzip writer of its own, unlike VEP) -- run_fastvep always hands off a
+//   plain-text VCF (decompressing the passthrough case with `zcat`, which
+//   reads bgzip output fine), and compress_annotated_vcf bgzips/tabixes it
+//   afterwards in the default container.
 // - `annotate_vcf` is a workflow with the same name and output as the process
 //   it replaces in modules/local/common.nf, so main.nf / wf-human-cnv.nf /
 //   wf-human-sv.nf only need to change how they call it by adding the new
@@ -58,7 +61,9 @@ process run_fastvep {
     // params.fastvep_sa_dir has been built with -- ClinVar/gnomAD/dbSNP/etc)
     // + ACMG-AMP classification with fastVEP, replacing Ensembl VEP. Falls
     // back to a plain passthrough for genomes other than hg19/hg38, same
-    // behaviour as the VEP/SnpEff steps this replaces.
+    // behaviour as the VEP/SnpEff steps this replaces. Always hands off a
+    // plain-text VCF -- compressing/indexing happens next, in
+    // compress_annotated_vcf, outside this container (see design notes above).
     label "fastvep_annotation"
     cpus 4
     memory 8.GB
@@ -67,15 +72,14 @@ process run_fastvep {
         val(genome)
         tuple path(ref), path(ref_idx), path(ref_cache), env(REF_PATH)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_${output_label}.vcf.gz"), path("${xam_meta.alias}.wf_${output_label}.vcf.gz.tbi"), emit: annot_vcf
+        tuple val(xam_meta), path("annotated.vcf"), val(output_label), emit: annotated
     script:
-        def out_name = "${xam_meta.alias}.wf_${output_label}.vcf.gz"
         def acmg_flag = params.fastvep_acmg ? '--acmg' : ''
         def pick_flag = params.fastvep_pick ? '--pick' : ''
         def hgvs_flag = params.fastvep_hgvs ? '--hgvs' : ''
         """
         if [[ "${genome}" != "hg38" ]] && [[ "${genome}" != "hg19" ]]; then
-            cp prepared.vcf.gz ${out_name}
+            zcat prepared.vcf.gz > annotated.vcf
         else
             fastvep annotate --input prepared.vcf.gz --output annotated.vcf \
                 --gff3 ${params.fastvep_gff3} \
@@ -83,8 +87,25 @@ process run_fastvep {
                 --sa-dir ${params.fastvep_sa_dir} \
                 --output-format ${params.fastvep_output_format} \
                 ${acmg_flag} ${pick_flag} ${hgvs_flag}
-            bgzip -c annotated.vcf > ${out_name}
         fi
+        """
+}
+
+
+process compress_annotated_vcf {
+    // bgzip + tabix the plain-text VCF run_fastvep produced. Runs in the
+    // pipeline's default container (bcftools/htslib), not fastvep_annotation
+    // -- see design notes above.
+    cpus 2
+    memory 2.GB
+    input:
+        tuple val(xam_meta), path("annotated.vcf"), val(output_label)
+    output:
+        tuple val(xam_meta), path("${xam_meta.alias}.wf_${output_label}.vcf.gz"), path("${xam_meta.alias}.wf_${output_label}.vcf.gz.tbi"), emit: annot_vcf
+    script:
+        def out_name = "${xam_meta.alias}.wf_${output_label}.vcf.gz"
+        """
+        bgzip -c annotated.vcf > ${out_name}
         tabix -p vcf ${out_name}
         """
 }
@@ -99,7 +120,8 @@ workflow annotate_vcf {
                            // shape as ref_channel elsewhere, fastVEP's --fasta
     main:
         prepared = prepare_annotation_input(vcf_contig_tuple, output_label).prepared
-        final_out = run_fastvep(prepared, genome, reference).annot_vcf
+        annotated = run_fastvep(prepared, genome, reference).annotated
+        final_out = compress_annotated_vcf(annotated).annot_vcf
     emit:
         annot_vcf = final_out
 }
