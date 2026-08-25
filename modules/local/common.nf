@@ -462,8 +462,16 @@ process normalize_vcf {
     output:
         tuple val(xam_meta), path("${xam_meta.alias}.wf_${output_label}.vcf.gz"), path("${xam_meta.alias}.wf_${output_label}.vcf.gz.tbi"), emit: normalized_vcf
     script:
+        // --check-ref s (not the default e/error): SV/CNV callers (Spectre, and
+        // symbolic-ALT records generally) routinely write REF=N as a placeholder
+        // for a <DEL>/<DUP>/etc record rather than the real reference base at
+        // that position -- bcftools norm's default -f validation treats that
+        // mismatch as fatal ("Reference allele mismatch"), which would abort
+        // every CNV/SV run. -c s replaces such placeholder REFs with the actual
+        // reference base instead of erroring; real (already-correct) REF bases,
+        // as Clair3 always writes for SNP, pass through unchanged either way.
         """
-        bcftools norm -m -any -f ${ref} -O z -o ${xam_meta.alias}.wf_${output_label}.vcf.gz ${vcf}
+        bcftools norm -m -any -f ${ref} --check-ref s -O z -o ${xam_meta.alias}.wf_${output_label}.vcf.gz ${vcf}
         tabix -p vcf ${xam_meta.alias}.wf_${output_label}.vcf.gz
         """
 }
