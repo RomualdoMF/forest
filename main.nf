@@ -879,7 +879,38 @@ workflow {
                 // inject TAPES' Probability_Path/Prediction_ACMG_tapes columns back into
                 // the VEP-annotated VCF as INFO fields -- published wf_snp.annotated.vcf.gz
                 // either way (see annotate_snp_vcf_with_tapes in modules/local/tapes.nf).
-                annotated_vcf_tuple = annotate_snp_vcf_with_tapes(vep_annotated_vcf, tapes_table).annotated_vcf
+                tapes_annotated_vcf = annotate_snp_vcf_with_tapes(vep_annotated_vcf, tapes_table).annotated_vcf
+                // Fallback when TAPES produces nothing: TAPES' ACMG engine (a fork tuned
+                // for Ensembl VEP's plugin-appended CSQ subfields) doesn't recognise
+                // fastVEP's annotations, which live in separate FV_*-prefixed INFO fields
+                // instead of being folded into CSQ -- it exits 0 with "All required
+                // annotations not found" on every contig, so
+                // run_tapes/merge_tapes/annotate_snp_vcf_with_tapes never actually produce
+                // a value and this whole branch would otherwise starve silently (no
+                // wf_snp.annotated.vcf.gz, no SNP report -- the pipeline still reports
+                // success). `.join(..., remainder: true)` keyed on xam_meta lets the
+                // fastVEP-only VCF through whenever the TAPES side never shows up, for
+                // whatever reason, instead of hard-blocking on it.
+                //
+                // Each side is packed into a single [vcf, tbi] field before the join, on
+                // purpose: Nextflow's `join(remainder: true)` pads a completely-missing
+                // side with exactly ONE `null`, not one null per field, so the emitted
+                // row's arity depends on whether a match was found (4 elements matched,
+                // 3 unmatched here) -- caught for real running this fix (a 5-param
+                // closure choked on the unmatched case's 4-element row the same way the
+                // unrelated `<<` mutation bug did earlier). Packing each side down to
+                // exactly one field keeps the joined row's arity constant (always 3:
+                // meta, vep_pair, tapes_pair-or-null) regardless of whether it matched.
+                annotated_vcf_tuple = vep_annotated_vcf
+                    .map { meta, vcf, tbi -> [meta, [vcf, tbi]] }
+                    .join(
+                        tapes_annotated_vcf.map { meta, vcf, tbi -> [meta, [vcf, tbi]] },
+                        remainder: true
+                    )
+                    .map { meta, vep_pair, tapes_pair ->
+                        def pair = tapes_pair != null ? tapes_pair : vep_pair
+                        [meta, pair[0], pair[1]]
+                    }
             } else {
                 tapes_table = Channel.empty()
                 annotated_vcf_tuple = vep_annotated_vcf
