@@ -62,8 +62,22 @@ workflow bam {
             )
         }
         else {
-            // append '*' to indicate that annotation should be performed on all chr at once
-            vcf_for_annotation = normalized.map{ it << '*' }
+            // append '*' to indicate that annotation should be performed on all chr at once.
+            // Explicit reconstruction, not `it << '*'`: List.leftShift mutates the row
+            // object in place and returns the same reference -- `normalized` has more
+            // than one subscriber in this workflow (see the `output =` channel in
+            // `emit:` below), and GPars broadcasts the same row object to every
+            // subscriber rather than cloning it. Mutating it here raced with the other
+            // subscriber's 3-param `.map{ meta, vcf, tbi -> ... }` closure reading that
+            // same object elsewhere in the dataflow graph: whichever one ran second saw
+            // a 4-element row where it expected 3, and Nextflow's `.map` operator won't
+            // spread a row into a closure whose declared param count doesn't match it,
+            // so it called the closure with the whole row as one argument instead --
+            // Groovy has no `call()` overload for a 3-param closure taking one ArrayList,
+            // so it raised a MissingMethodException. Non-deterministic (thread
+            // scheduling-dependent): only reproduced on the CNV path, not the
+            // structurally identical SV one, in the same run.
+            vcf_for_annotation = normalized.map{ meta, vcf, tbi -> [meta, vcf, tbi, '*'] }
             // annotate with fastVEP -- <alias>.wf_sv.annotated.vcf.gz
             fastvep_vcf = annotate_sv_vcf(vcf_for_annotation, genome_build, "sv.annotated", reference.collect()).annot_vcf
 
