@@ -64,9 +64,18 @@ process run_fastvep {
     // behaviour as the VEP/SnpEff steps this replaces. Always hands off a
     // plain-text VCF -- compressing/indexing happens next, in
     // compress_annotated_vcf, outside this container (see design notes above).
+    // Loading the full transcript cache (500k+ transcripts) plus a memory-mapped
+    // whole-genome FASTA plus the supplementary annotation sources routinely needs
+    // more than a few GB per contig -- got OOM-killed (exit 137) at a fixed 8GB on
+    // a real sample's larger contigs. Scale with task.attempt for retries (see
+    // lib/MemoryScaling.groovy), same pattern as run_tapes -- and note the
+    // errorStrategy: without it Nextflow's default ('terminate') would mean
+    // maxRetries has no effect at all.
     label "fastvep_annotation"
     cpus 4
-    memory 8.GB
+    memory { MemoryScaling.forAttempt(MemoryScaling.SERIES_16, task.attempt, params.max_memory) }
+    errorStrategy {task.exitStatus in [137,140] ? 'retry' : 'finish'}
+    maxRetries { MemoryScaling.retriesNeeded(MemoryScaling.SERIES_16, params.max_memory) }
     input:
         tuple val(xam_meta), path("prepared.vcf.gz"), val(output_label)
         val(genome)
