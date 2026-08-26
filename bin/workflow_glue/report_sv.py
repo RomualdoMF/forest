@@ -180,10 +180,22 @@ def sv_size_plots(vcf_data, max_size=5000):
                 p("This section shows the size distributions of SV calls per type. "
                     "Deletions have negative values.")
                 # Extract deletions
-                # CW-2492: ensure SVLEN is int
+                # CW-2492: ensure SVLEN is int. Not casting END here on purpose:
+                # Sniffles2 never gives INS records a meaningful END (it's always
+                # just POS again), and passing the annotated VCF through AnnotSV's
+                # pysam-based rewrite (bin/annotate_vcf_from_annotsv.py) drops the
+                # explicit INFO/END on every record regardless of SVTYPE -- htslib
+                # treats END as a special, non-INFO-dict field that isn't
+                # serialized back out unless the record's REF/ALT span implies it
+                # (confirmed directly: record.info.get('END') is None on read for
+                # every SVTYPE, DEL included, and pysam refuses record.info['END']
+                # = ... entirely -- "END is a reserved attribute; access is via
+                # record.stop"). END was never actually used below (indels is
+                # reduced to just the SVLEN series two lines down), so casting it
+                # was always dead code -- this just stops trying.
                 indels = vcf_df\
                     .loc[(vcf_df['SVTYPE'] == 'DEL') | (vcf_df['SVTYPE'] == 'INS')]\
-                    .astype({'SVLEN': int, 'END': int})
+                    .astype({'SVLEN': int})
                 # Keep SVs within range of interest
                 indels = indels.loc[np.abs(indels['SVLEN'].values) < max_size]
                 # Create plot
