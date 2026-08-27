@@ -80,6 +80,7 @@ include {
     refine_with_sv;
     vcfStats;
     output_snp;
+    filter_snp_vcf_by_qual_dp;
 } from "./modules/local/wf-human-snp.nf"
 
 include {
@@ -845,6 +846,12 @@ workflow {
         else {
             final_snp_vcf_filtered = final_snp_vcf
         }
+
+        // Real QUAL/DP filter (params.vcf_snv_min_qual/vcf_snv_min_dp), independent
+        // of --annotation -- see filter_snp_vcf_by_qual_dp in
+        // modules/local/wf-human-snp.nf for why this exists as its own explicit
+        // step instead of relying on params.min_qual/min_cov.
+        final_snp_vcf_filtered = filter_snp_vcf_by_qual_dp(final_snp_vcf_filtered).filtered
 
         // Run annotation, when requested.
         if (!params.annotation) {

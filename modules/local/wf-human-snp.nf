@@ -768,3 +768,36 @@ process lookup_clair3_model {
     echo "Clair3 model  : \${clair3_model}"
     """
 }
+
+
+process filter_snp_vcf_by_qual_dp {
+    // Real QUAL/DP filter on Clair3's raw SNP calls, run before any
+    // annotation (VEP/fastVEP/TAPES never see records this drops).
+    //
+    // Not the same thing as params.min_qual/min_mq/min_cov above:
+    // params.min_mq/min_cov reach Clair3's actual calling routines
+    // (CallVariantsFromCffi --minMQ/--minCoverage in pileup_variants and
+    // evaluate_candidates), but params.min_qual only ever reaches
+    // clair3.py CheckEnvs (make_chunks, --qual=...) -- an environment/
+    // provenance step, not a filtering one. Confirmed on a real run:
+    // wf_snp.vcf.gz had FILTER=PASS on all 5,561,570 records regardless of
+    // QUAL (minimum observed: 3), 6.3% below the configured min_qual=20 --
+    // this is inherited upstream epi2me-labs/wf-human-variation behaviour
+    // (traced via git blame to v0.1.0, 2022), not something introduced by
+    // this fork. params.vcf_snv_min_qual/vcf_snv_min_dp are separate, new
+    // params specifically for this explicit bcftools filter, so tuning them
+    // doesn't reinterpret what min_qual/min_cov mean to Clair3 itself.
+    cpus 1
+    memory 4.GB
+    input:
+        tuple val(xam_meta), path("input.vcf.gz"), path("input.vcf.gz.tbi")
+    output:
+        tuple val(xam_meta), path("${xam_meta.alias}.wf_snp.vcf.gz"), path("${xam_meta.alias}.wf_snp.vcf.gz.tbi"), emit: filtered
+    script:
+        """
+        bcftools view \
+            -e 'QUAL<${params.vcf_snv_min_qual} || FORMAT/DP<${params.vcf_snv_min_dp}' \
+            input.vcf.gz -O z -o ${xam_meta.alias}.wf_snp.vcf.gz
+        tabix -p vcf ${xam_meta.alias}.wf_snp.vcf.gz
+        """
+}

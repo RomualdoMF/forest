@@ -319,19 +319,18 @@ class NfcoreTemplate {
         return "${colors.dim}--------------------------------------------------------------------------------${colors.reset}"
     }
 
-    // epi2me-labs logo
+    // wf-omics logo
     public static String logo(workflow, monochrome_logs) {
         Map colors = NfcoreTemplate.logColours(monochrome_logs)
-        String workflow_name = workflow.manifest.name.split("/")[1]
-        String workflow_version = version(workflow)
         String.format(
             """
-            ${colors.igreen}||||||||||   ${colors.reset}${colors.dim}_____ ____ ___ ____  __  __ _____
-            ${colors.igreen}||||||||||  ${colors.reset}${colors.dim}| ____|  _ \\_ _|___ \\|  \\/  | ____|
-            ${colors.yellow}|||||       ${colors.reset}${colors.dim}|  _| | |_) | |  __) | |\\/| |  _|
-            ${colors.yellow}|||||       ${colors.reset}${colors.dim}| |___|  __/| | / __/| |  | | |__
-            ${colors.iblue}||||||||||  ${colors.reset}${colors.dim}|_____|_|  |___|_____|_|  |_|_____|
-            ${colors.iblue}||||||||||  ${colors.reset}${colors.bold}${workflow_name} ${workflow_version}${colors.reset}
+            ${colors.dim}░▒▓████████▓▒░▒▓██████▓▒░░▒▓███████▓▒░░▒▓████████▓▒░░▒▓███████▓▒░▒▓████████▓▒░ 
+            ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░         ░▒▓█▓▒░     
+            ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░         ░▒▓█▓▒░     
+            ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓██████▓▒░  ░▒▓██████▓▒░   ░▒▓█▓▒░     
+            ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░  ░▒▓█▓▒░     
+            ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░  ░▒▓█▓▒░     
+            ░▒▓█▓▒░      ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓███████▓▒░   ░▒▓█▓▒░     ${colors.reset}
             ${NfcoreTemplate.dashedLine(monochrome_logs)}
             """.stripIndent()
         )
