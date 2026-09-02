@@ -1,4 +1,4 @@
-# AnnotSV (https://github.com/lgmgeo/AnnotSV) container for wf-omics.
+# AnnotSV (https://github.com/lgmgeo/AnnotSV) container for forest.
 #
 # Bakes in AnnotSV itself (Tcl/Tk code only, no variantconvert -- see below)
 # -- NOT the human annotation data (Annotations_Human_*.tar.gz is ~5GB). That

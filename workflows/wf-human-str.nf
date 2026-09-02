@@ -68,7 +68,7 @@ workflow str {
           | unique
           | combine(branched_annotations.stranger_vcfs_and_tbis)
           | groupTuple,
-        "wf_str"
+        "str"
     ).final_vcf
 
     // merge the contig TSVs/CSVs

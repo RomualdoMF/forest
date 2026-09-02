@@ -2,7 +2,7 @@
 # transposable-element-mediated insertions in long-read alignments.
 #
 # Meant to run against the per-contig, pre-merge haplotagged BAMs already
-# produced during SNP calling/phasing (see workflows/wf-human-snp.nf,
+# produced during SNV calling/phasing (see workflows/wf-human-snv.nf,
 # `haplotagged_ctg_bams` / the `str_bams` emit -- same channel straglr's
 # call_str already consumes), not the final whole-genome BAM.
 #

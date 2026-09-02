@@ -79,7 +79,7 @@ process bam_region_filter {
         { grep ${xam_meta.sq} -Fw ${repeat_bed} || true; } > repeats_subset.bed
 
         if [[ -s repeats_subset.bed ]]; then
-            samtools view -b -h --write-index -o "${xam_meta.sq}.wf_str_regions.bam##idx##${xam_meta.sq}.wf_str_regions.bam.bai" -L repeats_subset.bed ${xam}
+            samtools view -b -h --write-index -o "${xam_meta.sq}.str_regions.bam##idx##${xam_meta.sq}.str_regions.bam.bai" -L repeats_subset.bed ${xam}
         else
             echo "blank subset BED"
         fi
@@ -97,7 +97,7 @@ process bam_read_filter {
     shell:
         """
         tail -n +3 !{straglr_tsv} | cut -f6 > reads_to_filter.txt
-        samtools view --write-index -N reads_to_filter.txt -o !{chr}.wf_str_reads.bam##idx##!{chr}.wf_str_reads.bam.bai !{xam}
+        samtools view --write-index -N reads_to_filter.txt -o !{chr}.str_reads.bam##idx##!{chr}.str_reads.bam.bai !{xam}
         """
 }
 
@@ -139,7 +139,7 @@ process merge_tsv {
         awk 'NR == 1 || FNR > 1' ${plot_tsv} >${xam_meta.alias}_plot.tsv
         awk 'NR == 1 || FNR > 1' ${stranger_tsv} >${xam_meta.alias}_stranger.tsv
         # Ignore the first line from straglr_tsv as it has a two-line header. Avoid sed altogether
-        awk 'NR == 2 || FNR > 2' ${straglr_tsv} > ${xam_meta.alias}.wf_str.straglr.tsv
+        awk 'NR == 2 || FNR > 2' ${straglr_tsv} > ${xam_meta.alias}.str.straglr.tsv
         awk 'NR == 1 || FNR > 1' ${str_content_csv} > ${xam_meta.alias}_str-content-all.csv
         """
 }
@@ -160,10 +160,10 @@ process make_report {
         path(bam_stats)
         val(sex)
     output:
-        path "*wf-human-str-report.html", emit: html
+        path "*str-report.html", emit: html
     script:
         String workflow_name = workflow.manifest.name.replace("epi2me-labs/", "")
-        def report_name = "${xam_meta.alias}.wf-human-str-report.html"
+        def report_name = "${xam_meta.alias}.str-report.html"
         // if params.sex is not provided, assume the workflow inferred it
         String sex_source = params.sex ? "user-provided" : "workflow-inferred"
         """

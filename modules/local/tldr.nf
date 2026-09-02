@@ -1,7 +1,7 @@
 // tldr (https://github.com/adamewing/tldr) -- identifies and annotates
 // transposable-element-mediated insertions in long-read alignments. Runs
 // per-contig, against the same intermediate haplotagged BAMs straglr's
-// call_str already consumes (workflows/wf-human-snp.nf, the `str_bams`
+// call_str already consumes (workflows/wf-human-snv.nf, the `str_bams`
 // emit) -- i.e. the phase where alignment has already happened but the
 // per-contig BAMs haven't been merged back into one whole-genome BAM yet.
 // See docker/tldr/Dockerfile for what's bundled in the image and why
@@ -77,10 +77,10 @@ process merge_tldr {
         path(tables)
         val(xam_meta)
     output:
-        path("*.wf_tldr.table.txt")
+        path("*.tldr.table.txt")
     script:
         """
-        awk 'FNR==1 && NR!=1 {next} {print}' ${tables} > ${xam_meta.alias}.wf_tldr.table.txt
+        awk 'FNR==1 && NR!=1 {next} {print}' ${tables} > ${xam_meta.alias}.tldr.table.txt
         """
 }
 

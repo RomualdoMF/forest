@@ -275,7 +275,7 @@ process failedQCReport  {
         // file for each chromosome. This will display the intervals not in the context of the chromosome (so showing a peak in
         // a small region, and flat everywhere else) but only for the regions selected.
         def genome_wide_depth = params.bed ? "" : "--reference_fai ref.fasta.fai"
-        def report_name = "${xam_meta.alias}.wf-human-alignment-report.html"
+        def report_name = "${xam_meta.alias}.alignment-report.html"
         def using_user_bed = using_user_bed ? "--using_user_bed" : ""
         
         // get the basename of the --bed and --coverage_bed if provided, used by the alignment report to
@@ -350,7 +350,7 @@ process makeAlignmentReport {
         path "*.html"
 
     script:
-        def report_name = "${xam_meta.alias}.wf-human-alignment-report.html"
+        def report_name = "${xam_meta.alias}.alignment-report.html"
         def using_user_bed = using_user_bed ? "--using_user_bed" : ""
 
         // get the basename of the --bed and --coverage_bed if provided, used by the alignment report to
@@ -434,18 +434,18 @@ process normalize_vcf {
     // allele and left-aligns indels against the reference, before any downstream
     // annotation touches the VCF. VEP/fastVEP's own per-transcript CSQ blocks
     // already cope with multiallelic records fine, but per-record consumers
-    // further downstream don't -- TAPES in particular (SNP path): its own
+    // further downstream don't -- TAPES in particular (SNV path): its own
     // decompose-multiallelics code path (tapes.py's test_if_decomposed, gated by
     // sampling just the input's first 2000 lines) never actually triggered on
-    // this pipeline's real per-contig SNP VCFs, so every multiallelic record's
+    // this pipeline's real per-contig SNV VCFs, so every multiallelic record's
     // ALT list came back from TAPES still comma-joined, unsplit -- see
-    // bin/annotate_vcf_with_tapes.py. Runs on the pre-annotation VCF (SNP/SV/CNV
+    // bin/annotate_vcf_with_tapes.py. Runs on the pre-annotation VCF (SNV/SV/CNV
     // all call this the same way) so annotation and everything else downstream
     // sees one allele per record; this becomes the published
-    // ${sample}.wf_${output_label}.vcf.gz -- the fastVEP-annotated file is
-    // ${sample}.wf_${output_label}.annotated.vcf.gz instead (see
-    // concat_snp_vcfs/annotate_snp_vcf_with_tapes in main.nf/modules/local/tapes.nf
-    // for SNP, or the `annotate_vcf` calls in workflows/wf-human-sv.nf /
+    // ${sample}.${output_label}.vcf.gz -- the fastVEP-annotated file is
+    // ${sample}.${output_label}.annotated.vcf.gz instead (see
+    // concat_snv_vcfs/annotate_snv_vcf_with_tapes in main.nf/modules/local/tapes.nf
+    // for SNV, or the `annotate_vcf` calls in workflows/wf-human-sv.nf /
     // wf-human-cnv.nf for SV/CNV), so the raw and annotated files never collide
     // on the same output filename regardless of --annotation.
     cpus 2
@@ -453,14 +453,14 @@ process normalize_vcf {
     input:
         tuple path(ref), path(ref_idx), path(ref_cache), env(REF_PATH)
         // stageAs on the input: its upstream name can already be
-        // ${alias}.wf_${output_label}.vcf.gz (same as this process' own output
+        // ${alias}.${output_label}.vcf.gz (same as this process' own output
         // below) -- staging it under a distinct name avoids bcftools reading and
-        // truncating the same path at once (seen for real on the SNP path:
+        // truncating the same path at once (seen for real on the SNV path:
         // "Failed to read BGZF block data", 0 records survived).
         tuple val(xam_meta), path(vcf, stageAs: "input.vcf.gz"), path(tbi, stageAs: "input.vcf.gz.tbi")
-        val(output_label)  // "snp" / "sv" / "cnv"
+        val(output_label)  // "snv" / "sv" / "cnv"
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_${output_label}.vcf.gz"), path("${xam_meta.alias}.wf_${output_label}.vcf.gz.tbi"), emit: normalized_vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.${output_label}.vcf.gz"), path("${xam_meta.alias}.${output_label}.vcf.gz.tbi"), emit: normalized_vcf
     script:
         // --check-ref s (not the default e/error): SV/CNV callers (Spectre, and
         // symbolic-ALT records generally) routinely write REF=N as a placeholder
@@ -469,10 +469,10 @@ process normalize_vcf {
         // mismatch as fatal ("Reference allele mismatch"), which would abort
         // every CNV/SV run. -c s replaces such placeholder REFs with the actual
         // reference base instead of erroring; real (already-correct) REF bases,
-        // as Clair3 always writes for SNP, pass through unchanged either way.
+        // as Clair3 always writes for SNV, pass through unchanged either way.
         """
-        bcftools norm -m -any -f ${ref} --check-ref s -O z -o ${xam_meta.alias}.wf_${output_label}.vcf.gz ${vcf}
-        tabix -p vcf ${xam_meta.alias}.wf_${output_label}.vcf.gz
+        bcftools norm -m -any -f ${ref} --check-ref s -O z -o ${xam_meta.alias}.${output_label}.vcf.gz ${vcf}
+        tabix -p vcf ${xam_meta.alias}.${output_label}.vcf.gz
         """
 }
 
@@ -484,11 +484,11 @@ process haploblocks {
         tuple val(xam_meta), path(phased_vcf), path(phased_tbi)
         val output_label
     output:
-        path "${xam_meta.alias}.wf_${output_label}.haploblocks.gtf", emit: phase_blocks
+        path "${xam_meta.alias}.${output_label}.haploblocks.gtf", emit: phase_blocks
     script:
         """
         # Prepare correct input file
-        whatshap stats --gtf=${xam_meta.alias}.wf_${output_label}.haploblocks.gtf ${phased_vcf}
+        whatshap stats --gtf=${xam_meta.alias}.${output_label}.haploblocks.gtf ${phased_vcf}
         """
 }
 
@@ -502,11 +502,11 @@ process bed_filter {
         val(subworkflow)
         val(file_type)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_${subworkflow}.${file_type}.gz"), path("${xam_meta.alias}.wf_${subworkflow}.${file_type}.gz.tbi"), emit: filtered
+        tuple val(xam_meta), path("${xam_meta.alias}.${subworkflow}.${file_type}.gz"), path("${xam_meta.alias}.${subworkflow}.${file_type}.gz.tbi"), emit: filtered
     script:
         """
-        bedtools intersect -u -header -a input.gz -b ${bed} | bgzip -c > ${xam_meta.alias}.wf_${subworkflow}.${file_type}.gz
-        tabix ${xam_meta.alias}.wf_${subworkflow}.${file_type}.gz
+        bedtools intersect -u -header -a input.gz -b ${bed} | bgzip -c > ${xam_meta.alias}.${subworkflow}.${file_type}.gz
+        tabix ${xam_meta.alias}.${subworkflow}.${file_type}.gz
         """
 }
 
@@ -529,7 +529,7 @@ process sanitise_bed {
 }
 
 // Combine the JSON with base metrics for read stats,
-// coverage, SNPs and SVs
+// coverage, SNVs and SVs
 // NOTE The keys in here are rather sad to look at but form part of downstream
 //   processes for several 3rd party providers and MUST NOT be fiddled with.
 // Currently, the workflow's sample_name parameter is used to fill in

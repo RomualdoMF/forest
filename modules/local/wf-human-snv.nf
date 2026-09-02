@@ -1,12 +1,12 @@
 // As of Clair3 v1.0.6, set `--min_snp_af` and `--min_indel_af` to 0 with `--vcf_fn`.
-def snp_min_af = params.vcf_fn ? "--snp_min_af 0.0": "--snp_min_af ${params.snp_min_af}"
+def snv_min_af = params.vcf_fn ? "--snp_min_af 0.0": "--snp_min_af ${params.snv_min_af}"
 def indel_min_af = params.vcf_fn ? "--indel_min_af 0.0" : "--indel_min_af ${params.indel_min_af}"
 
 process make_chunks {
     // Do some preliminaries. Ordinarily this would setup a working directory
     // that all other commands would make use off, but all we need here are the
     // list of contigs and chunks.
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 1
     memory 4.GB
     input:
@@ -41,7 +41,7 @@ process make_chunks {
         """
         # CW-2456: save command line to add to VCF file (very long command...)
         mkdir -p clair_output/tmp
-        echo "run_clair3.sh --bam_fn=${xam} ${bedprnt} --ref_fn=${ref} ${vcfprnt} --output=clair_output --platform=ont --sample_name=${xam_meta.alias} --model_path=${model_path.simpleName} --ctg_name=${params.ctg_name} ${ctg_name} --include_all_ctgs=${params.include_all_ctgs} --chunk_num=0 --chunk_size=5000000 --qual=${params.min_qual} --var_pct_full=${params.var_pct_full} --ref_pct_full=${params.ref_pct_full} ${snp_min_af} ${indel_min_af} --min_contig_size=${params.min_contig_size}" > clair_output/tmp/CMD
+        echo "run_clair3.sh --bam_fn=${xam} ${bedprnt} --ref_fn=${ref} ${vcfprnt} --output=clair_output --platform=ont --sample_name=${xam_meta.alias} --model_path=${model_path.simpleName} --ctg_name=${params.ctg_name} ${ctg_name} --include_all_ctgs=${params.include_all_ctgs} --chunk_num=0 --chunk_size=5000000 --qual=${params.min_qual} --var_pct_full=${params.var_pct_full} --ref_pct_full=${params.ref_pct_full} ${snv_min_af} ${indel_min_af} --min_contig_size=${params.min_contig_size}" > clair_output/tmp/CMD
         # CW-2456: prepare other inputs normally
         python \$(which clair3.py) CheckEnvs \
             --bam_fn ${xam} \
@@ -58,7 +58,7 @@ process make_chunks {
             --sampleName ${xam_meta.alias} \
             --var_pct_full ${params.var_pct_full} \
             --ref_pct_full ${params.ref_pct_full} \
-            ${snp_min_af} \
+            ${snv_min_af} \
             ${indel_min_af} \
             --min_contig_size ${params.min_contig_size} \
             --cmd_fn clair_output/tmp/CMD
@@ -68,7 +68,7 @@ process make_chunks {
 
 process pileup_variants {
     // Calls variants per region ("chunk") using pileup network.
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 1
     memory { MemoryScaling.forAttempt(MemoryScaling.SERIES_4, task.attempt, params.max_memory) }
     errorStrategy 'retry'
@@ -88,7 +88,7 @@ process pileup_variants {
     script:
         // note: the VCF output here is required to use the contig
         //       name since that's parsed in the SortVcf step
-        // note: snp_min_af and indel_min_af have an impact on performance
+        // note: snv_min_af and indel_min_af have an impact on performance
         def bedargs = bed.name != 'OPTIONAL_FILE' ? "--bed_fn ${bed} --extend_bed split_bed/${region.contig}" : ''
         """
         python \$(which clair3.py) CallVariantsFromCffi \
@@ -101,7 +101,7 @@ process pileup_variants {
             --chunk_num ${region.total_chunks} \
             --platform ont \
             --fast_mode False \
-            ${snp_min_af} \
+            ${snv_min_af} \
             ${indel_min_af} \
             --minMQ ${params.min_mq} \
             --minCoverage ${params.min_cov} \
@@ -121,7 +121,7 @@ process aggregate_pileup_variants {
     // Aggregates and sorts all variants (across all chunks of all contigs)
     // from pileup network. Determines quality filter for selecting variants
     // to use for phasing.
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 2
     memory { MemoryScaling.forAttempt(MemoryScaling.SERIES_4, task.attempt, params.max_memory) }
     maxRetries { MemoryScaling.retriesNeeded(MemoryScaling.SERIES_4, params.max_memory) }
@@ -158,9 +158,9 @@ process aggregate_pileup_variants {
 }
 
 
-process select_het_snps {
-    // Filters a VCF by contig, selecting only het SNPs.
-    label "wf_human_snp"
+process select_het_snvs {
+    // Filters a VCF by contig, selecting only het SNVs.
+    label "wf_human_snv"
     cpus 2
     memory 4.GB
     input:
@@ -184,7 +184,7 @@ process select_het_snps {
 }
 
 process phase_contig {
-    // Tags reads in an input BAM from heterozygous SNPs
+    // Tags reads in an input BAM from heterozygous SNVs
     // The haplotag step was removed in clair-v0.1.11 so this step re-emits
     //   the original BAM and BAI as phased_bam for compatability,
     //   but adds the VCF as it is now tagged with phasing information
@@ -218,7 +218,7 @@ process phase_contig {
 // (eg. decoys) and unaligned reads. the file output from this process will be the
 // "final" XAM provided to the user.
 process cat_haplotagged_contigs {
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 4
     memory 15.GB // cat should not need this, but weirdness occasionally strikes
     input:
@@ -266,7 +266,7 @@ process cat_haplotagged_contigs {
 process get_qual_filter {
     // Determines quality filter for selecting candidate variants for second
     // stage "full alignment" calling.
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 2
     memory 4.GB
     input:
@@ -292,7 +292,7 @@ process create_candidates {
     // from the previous full "pileup" variants across all chunks of all chroms
     //
     // Performed per chromosome; output a list of bed files one for each chunk.
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 2
     memory 4.GB
     input:
@@ -329,7 +329,7 @@ process create_candidates {
 process evaluate_candidates {
     // Run "full alignment" network for variants in a candidate bed file.
     // phased_bam just references the input BAM as it no longer contains phase information.
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 1
     memory { MemoryScaling.forAttempt(MemoryScaling.SERIES_4, task.attempt, params.max_memory) }
     errorStrategy 'retry'
@@ -360,7 +360,7 @@ process evaluate_candidates {
             --gvcf ${params.GVCF} \
             --minMQ ${params.min_mq} \
             --minCoverage ${params.min_cov} \
-            ${snp_min_af} \
+            ${snv_min_af} \
             ${indel_min_af} \
             --platform ont \
             --cmd_fn ${command} \
@@ -371,7 +371,7 @@ process evaluate_candidates {
 
 process aggregate_full_align_variants {
     // Sort and merge all "full alignment" variants
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 2
     memory { MemoryScaling.forAttempt(MemoryScaling.SERIES_4, task.attempt, params.max_memory) }
     maxRetries { MemoryScaling.retriesNeeded(MemoryScaling.SERIES_4, params.max_memory) }
@@ -418,7 +418,7 @@ process aggregate_full_align_variants {
 
 process merge_pileup_and_full_vars{
     // Merge VCFs
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 2
     memory 4.GB
     input:
@@ -458,7 +458,7 @@ process merge_pileup_and_full_vars{
 
 process post_clair_phase_contig {
     // Phase VCF for a contig
-    // CW-2383: now uses base image to allow phasing of both snps and indels
+    // CW-2383: now uses base image to allow phasing of both snvs and indels
     cpus 1
     // Define memory from phasing tool and number of attempt
     memory { MemoryScaling.forAttempt(MemoryScaling.SERIES_4, task.attempt, params.max_memory) }
@@ -496,7 +496,7 @@ process post_clair_phase_contig {
 }
 
 process post_clair_contig_haplotag {
-    // Tags reads in an input BAM from heterozygous SNPs
+    // Tags reads in an input BAM from heterozygous SNVs
     // Also haplotag for those modes that need it
     // We emit BAM as the STR workflow does not fully support CRAM, and so the
     // STR workflow can start while the haplotagged XAM is being catted and
@@ -535,7 +535,7 @@ process post_clair_contig_haplotag {
 
 
 process aggregate_all_variants{
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 4
     memory { MemoryScaling.forAttempt(MemoryScaling.SERIES_8, task.attempt, params.max_memory) }
     maxRetries { MemoryScaling.retriesNeeded(MemoryScaling.SERIES_8, params.max_memory) }
@@ -548,8 +548,8 @@ process aggregate_all_variants{
         path contigs
         path command
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_snp.vcf.gz"), path("${xam_meta.alias}.wf_snp.vcf.gz.tbi"), emit: vcf
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_snp.gvcf.gz"), path("${xam_meta.alias}.wf_snp.gvcf.gz.tbi"), emit: gvcf, optional: true
+        tuple val(xam_meta), path("${xam_meta.alias}.snv.vcf.gz"), path("${xam_meta.alias}.snv.vcf.gz.tbi"), emit: vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.snv.gvcf.gz"), path("${xam_meta.alias}.snv.gvcf.gz.tbi"), emit: gvcf, optional: true
     script:
         def prefix = params.phased || params.str ? "phased" : "merge"
         """
@@ -558,13 +558,13 @@ process aggregate_all_variants{
         pypy \$(which clair3.py) SortVcf \
             --input_dir merge_output \
             --vcf_fn_prefix $prefix \
-            --output_fn ${xam_meta.alias}.wf_snp.vcf \
+            --output_fn ${xam_meta.alias}.snv.vcf \
             --sampleName ${xam_meta.alias} \
             --ref_fn ${ref} \
             --cmd_fn ${command} \
             --contigs_fn ${contigs}
 
-        if [ "\$( bgzip -fdc ${xam_meta.alias}.wf_snp.vcf.gz | grep -v '#' | wc -l )" -eq 0 ]; then
+        if [ "\$( bgzip -fdc ${xam_meta.alias}.snv.vcf.gz | grep -v '#' | wc -l )" -eq 0 ]; then
             echo "[INFO] Exit in all contigs variant merging"
             exit 0
         fi
@@ -583,8 +583,8 @@ process aggregate_all_variants{
 
                 # Reheading samples named "SAMPLE" to xam_meta.alias.
                 echo "SAMPLE" "${xam_meta.alias}" > rename.txt
-                bcftools reheader -s rename.txt tmp.gvcf.gz > ${xam_meta.alias}.wf_snp.gvcf.gz
-                bcftools index -t ${xam_meta.alias}.wf_snp.gvcf.gz && rm tmp.gvcf.gz rename.txt
+                bcftools reheader -s rename.txt tmp.gvcf.gz > ${xam_meta.alias}.snv.gvcf.gz
+                bcftools index -t ${xam_meta.alias}.snv.gvcf.gz && rm tmp.gvcf.gz rename.txt
         fi
 
         echo "[INFO] Finish calling, output file: merge_output.vcf.gz"
@@ -594,7 +594,7 @@ process aggregate_all_variants{
 
 // observed refine_with_sv exiting 1 (rather than 137) when cgroups kill the samtools process forked from clair3.py
 process refine_with_sv {
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 4
     memory { MemoryScaling.forAttempt(MemoryScaling.SERIES_8, task.attempt, params.max_memory) }
     maxRetries { MemoryScaling.retriesNeeded(MemoryScaling.SERIES_8, params.max_memory) }
@@ -606,7 +606,7 @@ process refine_with_sv {
         tuple path(xam), path(xam_idx), val(xam_meta) // this may be a haplotagged_bam or input CRAM 
         path(sniffles_vcf)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.${contig}.wf_snp.vcf.gz"), path("${xam_meta.alias}.${contig}.wf_snp.vcf.gz.tbi"), emit: vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.${contig}.snv.vcf.gz"), path("${xam_meta.alias}.${contig}.snv.vcf.gz.tbi"), emit: vcf
     script:
         def pool_threads = Math.max(task.cpus - 1, 1)
         """
@@ -614,7 +614,7 @@ process refine_with_sv {
             --bam_fn ${xam} \
             --clair3_vcf_input clair.vcf.gz \
             --sv_vcf_input ${sniffles_vcf} \
-            --vcf_output "${xam_meta.alias}.${contig}.wf_snp.vcf" \
+            --vcf_output "${xam_meta.alias}.${contig}.snv.vcf" \
             --threads ${pool_threads} \
             --ctg_name '${contig}'
         """
@@ -624,22 +624,22 @@ process refine_with_sv {
  * Add missing phasing tags from a given VCF file to a target gVCF file
  */
 process phase_gvcf {
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 2
     memory 4.GB
     input:
         tuple val(xam_meta), path('clair3.vcf.gz'), path('clair3.vcf.gz.tbi'), path('clair3.gvcf.gz'), path('clair3.gvcf.gz.tbi')
             
     output:
-        tuple path("${xam_meta.alias}.wf_snp.gvcf.gz"),
-            path("${xam_meta.alias}.wf_snp.gvcf.gz.tbi"),
+        tuple path("${xam_meta.alias}.snv.gvcf.gz"),
+            path("${xam_meta.alias}.snv.gvcf.gz.tbi"),
             emit: phased_gvcf
             
     script:
         """
         # Transfer annotation.
-        bcftools annotate --threads ${task.cpus - 1} -O z --annotations clair3.vcf.gz -c FORMAT/GT,FORMAT/PS clair3.gvcf.gz > ${xam_meta.alias}.wf_snp.gvcf.gz \
-        && tabix -p vcf ${xam_meta.alias}.wf_snp.gvcf.gz
+        bcftools annotate --threads ${task.cpus - 1} -O z --annotations clair3.vcf.gz -c FORMAT/GT,FORMAT/PS clair3.gvcf.gz > ${xam_meta.alias}.snv.gvcf.gz \
+        && tabix -p vcf ${xam_meta.alias}.snv.gvcf.gz
         """
 }
 
@@ -671,9 +671,9 @@ process hap {
 // See https://github.com/nextflow-io/nextflow/issues/1636
 // This is the only way to publish files from a workflow whilst
 // decoupling the publish from the process steps.
-process output_snp {
+process output_snv {
     // publish inputs to output directory
-    label "wf_human_snp"
+    label "wf_human_snv"
     publishDir "${params.out_dir}", mode: 'copy', pattern: "*"
     input:
         file fname
@@ -687,7 +687,7 @@ process output_snp {
 
 
 process getVersions {
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 1
     output:
         path "versions.txt"
@@ -699,7 +699,7 @@ process getVersions {
 
 
 process vcfStats {
-    label "wf_human_snp"
+    label "wf_human_snv"
     cpus 2
     input:
         tuple val(xam_meta), path(vcf), path(index)
@@ -722,7 +722,7 @@ process makeReport {
         path "params.json"
         path annotated_vcf
     output:
-        path "${xam_meta.alias}.wf-human-snp-report.html", emit: 'report', optional: true
+        path "${xam_meta.alias}.snv-report.html", emit: 'report', optional: true
         path "${xam_meta.alias}.snvs.json", emit: 'json'
     script:
         String workflow_name = workflow.manifest.name.replace("epi2me-labs/", "")
@@ -730,13 +730,13 @@ process makeReport {
         def annotation = params.annotation ? "" : "--skip_annotation"
         def generate_html = params.output_report ? "" : "--skip_report"
 
-        report_name = "${xam_meta.alias}.wf-human-snp-report.html"
+        report_name = "${xam_meta.alias}.snv-report.html"
         wfversion = workflow.manifest.version
         if( workflow.commitId ){
             wfversion = workflow.commitId
         }
         """
-        workflow-glue report_snp \
+        workflow-glue report_snv \
         $report_name \
         --workflow_name ${workflow_name} \
         --versions $versions \
@@ -754,7 +754,7 @@ process makeReport {
 // outside the container, by exporting them out of the container back to workdir.
 // This saves us passing around tuples of val(inside) and path(outside).
 process lookup_clair3_model {
-    label "wf_human_snp"
+    label "wf_human_snv"
     input:
         path("lookup_table")
         val basecall_model
@@ -770,8 +770,8 @@ process lookup_clair3_model {
 }
 
 
-process filter_snp_vcf_by_qual_dp {
-    // Real QUAL/DP filter on Clair3's raw SNP calls, run before any
+process filter_snv_vcf_by_qual_dp {
+    // Real QUAL/DP filter on Clair3's raw SNV calls, run before any
     // annotation (VEP/fastVEP/TAPES never see records this drops).
     //
     // Not the same thing as params.min_qual/min_mq/min_cov above:
@@ -780,7 +780,7 @@ process filter_snp_vcf_by_qual_dp {
     // evaluate_candidates), but params.min_qual only ever reaches
     // clair3.py CheckEnvs (make_chunks, --qual=...) -- an environment/
     // provenance step, not a filtering one. Confirmed on a real run:
-    // wf_snp.vcf.gz had FILTER=PASS on all 5,561,570 records regardless of
+    // snv.vcf.gz had FILTER=PASS on all 5,561,570 records regardless of
     // QUAL (minimum observed: 3), 6.3% below the configured min_qual=20 --
     // this is inherited upstream epi2me-labs/wf-human-variation behaviour
     // (traced via git blame to v0.1.0, 2022), not something introduced by
@@ -792,12 +792,12 @@ process filter_snp_vcf_by_qual_dp {
     input:
         tuple val(xam_meta), path("input.vcf.gz"), path("input.vcf.gz.tbi")
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_snp.vcf.gz"), path("${xam_meta.alias}.wf_snp.vcf.gz.tbi"), emit: filtered
+        tuple val(xam_meta), path("${xam_meta.alias}.snv.vcf.gz"), path("${xam_meta.alias}.snv.vcf.gz.tbi"), emit: filtered
     script:
         """
         bcftools view \
             -e 'QUAL<${params.vcf_snv_min_qual} || FORMAT/DP<${params.vcf_snv_min_dp}' \
-            input.vcf.gz -O z -o ${xam_meta.alias}.wf_snp.vcf.gz
-        tabix -p vcf ${xam_meta.alias}.wf_snp.vcf.gz
+            input.vcf.gz -O z -o ${xam_meta.alias}.snv.vcf.gz
+        tabix -p vcf ${xam_meta.alias}.snv.vcf.gz
         """
 }

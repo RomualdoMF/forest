@@ -1,5 +1,5 @@
 reports:
-    '*wf-human-snp-report.html':
-        display: "wf-human-snp report"
-    '*wf-human-sv-report.html':
-        display: "wf-human-sv report"
+    '*snv-report.html':
+        display: "snv report"
+    '*sv-report.html':
+        display: "sv report"

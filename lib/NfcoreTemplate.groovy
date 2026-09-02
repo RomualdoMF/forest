@@ -319,7 +319,7 @@ class NfcoreTemplate {
         return "${colors.dim}--------------------------------------------------------------------------------${colors.reset}"
     }
 
-    // wf-omics logo
+    // forest logo
     public static String logo(workflow, monochrome_logs) {
         Map colors = NfcoreTemplate.logColours(monochrome_logs)
         String.format(

@@ -5,8 +5,8 @@
 // dbNSFP5.3.1a in-silico predictor / ClinVar / gnomAD columns wired in via
 // params.vep_plugin_args (see nextflow.config, the "dbNSFP" entry).
 //
-// Runs per-contig against the same per-contig annotated SNP VCFs already produced by
-// annotate_snp_vcf in main.nf (the `annotations` channel, *before* concat_snp_vcfs merges
+// Runs per-contig against the same per-contig annotated SNV VCFs already produced by
+// annotate_snv_vcf in main.nf (the `annotations` channel, *before* concat_snv_vcfs merges
 // them into one whole-sample VCF) -- ACMG classification is purely per-variant, so there's
 // no need to wait for the merge, same reasoning as modules/local/tldr.nf running on
 // per-contig BAMs instead of the final whole-genome one.
@@ -64,17 +64,17 @@ process merge_tapes {
         path(tables)
         val(xam_meta)
     output:
-        path("*.wf_snp.tapes.txt")
+        path("*.snv.tapes.txt")
     script:
         """
-        awk 'FNR==1 && NR!=1 {next} {print}' ${tables} > ${xam_meta.alias}.wf_snp.tapes.txt
+        awk 'FNR==1 && NR!=1 {next} {print}' ${tables} > ${xam_meta.alias}.snv.tapes.txt
         """
 }
 
 
-process annotate_snp_vcf_with_tapes {
+process annotate_snv_vcf_with_tapes {
     // writes TAPES' Probability_Path/Prediction_ACMG_tapes columns back into the
-    // VEP-annotated SNP VCF as INFO fields -- see bin/annotate_vcf_with_tapes.py.
+    // VEP-annotated SNV VCF as INFO fields -- see bin/annotate_vcf_with_tapes.py.
     // Same idea as annotate_vcf_with_tsv (modules/local/annotsv.nf) does for
     // CNV/SV's AnnotSV+ClassifyCNV columns, but its own process/script here: the
     // join key (Chr/Start/Ref/Alt, not Chr/Start/Type) and TAPES' much taller
@@ -89,29 +89,29 @@ process annotate_snp_vcf_with_tapes {
         tuple val(xam_meta), path("input.vcf.gz"), path("input.vcf.gz.tbi")
         path(tapes_table)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_snp.annotated.vcf.gz"), path("${xam_meta.alias}.wf_snp.annotated.vcf.gz.tbi"), emit: annotated_vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.snv.annotated.vcf.gz"), path("${xam_meta.alias}.snv.annotated.vcf.gz.tbi"), emit: annotated_vcf
     script:
         """
         annotate_vcf_with_tapes.py \
             --tapes-tsv ${tapes_table} \
             --input-vcf input.vcf.gz \
-            --output-vcf ${xam_meta.alias}.wf_snp.annotated.vcf.gz
+            --output-vcf ${xam_meta.alias}.snv.annotated.vcf.gz
         """
 }
 
 
 workflow tapes_classify {
     take:
-        annotated_snp_contigs  // tuple(xam_meta, vcf.gz, vcf.gz.tbi) per contig -- the
-                                // `annotations` channel from main.nf's SNP annotation block
+        annotated_snv_contigs  // tuple(xam_meta, vcf.gz, vcf.gz.tbi) per contig -- the
+                                // `annotations` channel from main.nf's SNV annotation block
         genome                 // "hg38" / "hg19" / other
     main:
-        per_contig_tables = run_tapes(annotated_snp_contigs, genome).table
+        per_contig_tables = run_tapes(annotated_snv_contigs, genome).table
 
         // same pattern as modules/local/tldr.nf::workflow tldr -- xam_meta is per-contig
         // here too (carries sq:/id:), so dedupe down to just meta.alias for the merged
         // output name.
-        alias = annotated_snp_contigs
+        alias = annotated_snv_contigs
             | map { meta, vcf, tbi -> ['alias': meta.alias] }
             | unique
 

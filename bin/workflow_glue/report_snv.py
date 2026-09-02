@@ -189,7 +189,7 @@ def load_clin_sig_variants(vcf_fn, sample_name, benign=False):
 
 def main(args):
     """Run the entry point."""
-    logger = get_named_logger("report_snp")
+    logger = get_named_logger("report_snv")
     clinvar_docs_url = "https://www.ncbi.nlm.nih.gov/clinvar/docs/clinsig/"
 
     # Check that the input files exist

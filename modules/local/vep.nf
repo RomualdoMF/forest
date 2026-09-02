@@ -33,7 +33,7 @@
 
 
 process prepare_annotation_input {
-    // split the input VCF down to a single contig (SNP path, annotated
+    // split the input VCF down to a single contig (SNV path, annotated
     // per-contig for parallelism) or pass the whole file through unchanged
     // (SV/CNV path, marked with contig == '*').
     cpus 1
@@ -110,9 +110,9 @@ process compress_annotated_vcf {
     input:
         tuple val(xam_meta), path("annotated.vcf"), val(output_label)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_${output_label}.vcf.gz"), path("${xam_meta.alias}.wf_${output_label}.vcf.gz.tbi"), emit: annot_vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.${output_label}.vcf.gz"), path("${xam_meta.alias}.${output_label}.vcf.gz.tbi"), emit: annot_vcf
     script:
-        def out_name = "${xam_meta.alias}.wf_${output_label}.vcf.gz"
+        def out_name = "${xam_meta.alias}.${output_label}.vcf.gz"
         """
         bgzip -c annotated.vcf > ${out_name}
         tabix -p vcf ${out_name}
@@ -124,7 +124,7 @@ workflow annotate_vcf {
     take:
         vcf_contig_tuple  // tuple(xam_meta, vcf.gz, vcf.gz.tbi, contig)
         genome            // "hg38" / "hg19" / other
-        output_label      // e.g. "snp", "sv", "cnv"
+        output_label      // e.g. "snv", "sv", "cnv"
         reference         // tuple(ref, ref_idx, ref_cache, REF_PATH) -- same
                            // shape as ref_channel elsewhere, fastVEP's --fasta
     main:

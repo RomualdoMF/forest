@@ -32,12 +32,12 @@ process bgzip_and_index_vcf {
     input:
         tuple val(xam_meta), path(spectre_vcf)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_cnv.vcf.gz"), path("${xam_meta.alias}.wf_cnv.vcf.gz.tbi"), emit: spectre_final_vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.cnv.vcf.gz"), path("${xam_meta.alias}.cnv.vcf.gz.tbi"), emit: spectre_final_vcf
     script:
         """
         bgzip ${spectre_vcf}
-        mv ${spectre_vcf}.gz ${xam_meta.alias}.wf_cnv.vcf.gz
-        tabix -f -p vcf ${xam_meta.alias}.wf_cnv.vcf.gz
+        mv ${spectre_vcf}.gz ${xam_meta.alias}.cnv.vcf.gz
+        tabix -f -p vcf ${xam_meta.alias}.cnv.vcf.gz
         """
 }
 
@@ -52,8 +52,8 @@ process getVersions {
         """
 }
 
-process add_snp_tools_to_versions {
-    label "wf_human_snp"
+process add_snv_tools_to_versions {
+    label "wf_human_snv"
     cpus 1
     memory "2 GB"
     input: path "old_versions.txt"
@@ -77,10 +77,10 @@ process makeReport {
         tuple val(xam_meta), path(karyotype)
         val genome_build
     output:
-        path("*wf-human-cnv-report.html")
+        path("*cnv-report.html")
     script:
         String workflow_name = workflow.manifest.name.replace("epi2me-labs/", "")
-        def report_name = "${xam_meta.alias}.wf-human-cnv-report.html"
+        def report_name = "${xam_meta.alias}.cnv-report.html"
         """
         workflow-glue report_cnv_spectre \
             --sample_id ${xam_meta.alias} \

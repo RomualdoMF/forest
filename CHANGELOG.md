@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+Rebranded this fork from wf-human-variation/wf-omics to **forest**, ahead of an independent relaunch.
+
+### Changed
+- Renamed the workflow everywhere: `manifest.name`, `params.wf.name`, the nextflow_schema.json title/$id/workflow_title, README, docs, and report/help text now say "forest" instead of "wf-human-variation"/"wf-omics".
+- Dropped the `wf_`/`wf-human-` prefix from every output filename (e.g. `wf_snp.vcf.gz` -> `snv.vcf.gz`, `wf-human-sv-report.html` -> `sv-report.html`).
+- Renamed "snp" to "snv" throughout (files, processes, variables, docs) to match what Clair3 actually calls -- SNVs and indels, not strictly SNPs. This includes a breaking CLI change: `--snp` -> `--snv`, `--snp_min_af` -> `--snv_min_af`, `--refine_snp_with_sv` -> `--refine_snv_with_sv`.
+
 ## [v2.8.1]
 This patch release of wf-human-variation adds automatic model selection for data basecalled by the v6.0.0 HAC model. 
 Users of v2.8.0 do not need to adopt this release unless they have chosen to use Dorado with v6 models.

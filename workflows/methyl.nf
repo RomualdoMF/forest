@@ -36,7 +36,7 @@ process modkit {
     """
     modkit pileup \\
         ${xam} \\
-        ${meta.alias}.wf_mods.${meta.sq}.bedmethyl.gz \\
+        ${meta.alias}.mods.${meta.sq}.bedmethyl.gz \\
         --modified-bases 5mC 5hmC \\
         --ref ${ref} \\
         --region ${meta.sq} \\
@@ -74,7 +74,7 @@ process modkit_phase {
         --modified-bases 5mC 5hmC \\
         --ref ${ref} \\
         --phased \\
-        --prefix ${meta.alias}.wf_mods.${meta.sq} \\
+        --prefix ${meta.alias}.mods.${meta.sq} \\
         --log-filepath modkit.log \\
         --region ${meta.sq} \\
         ${meta.probs} \\
@@ -84,9 +84,9 @@ process modkit_phase {
     # Compress all
     for i in `ls ${meta.alias}/`; do
         root_name=\$( basename \$i '.bed.gz' )
-        # modkit saves the file as meta.alias.wf_mods.sq_haplotype.bed.gz
-        # create a new name with the patter meta.alias.wf_mods.haplotype.bedmethyl
-        new_name=\$( echo \${root_name} | sed 's/wf_mods\\.${meta.sq}_/wf_mods\\.${meta.sq}\\./' )
+        # modkit saves the file as meta.alias.mods.sq_haplotype.bed.gz
+        # create a new name with the patter meta.alias.mods.haplotype.bedmethyl
+        new_name=\$( echo \${root_name} | sed 's/mods\\.${meta.sq}_/mods\\.${meta.sq}\\./' )
         mv ${meta.alias}/\${root_name}.bed.gz ${meta.alias}/\${new_name}.bedmethyl.gz
     done
     """
@@ -99,7 +99,7 @@ process concat_bedmethyl {
     input:
         tuple val(meta), val(group), path("bedmethyls/*")
     output:
-        tuple val(meta), val(group), path("${meta.alias}.wf_mods.*bedmethyl.gz")
+        tuple val(meta), val(group), path("${meta.alias}.mods.*bedmethyl.gz")
 
     script:
     // Concatenate the bedMethyl, sort them and compress them
@@ -107,7 +107,7 @@ process concat_bedmethyl {
     """
     zcat -f bedmethyls/* | \
         sort -k 1,1 -k2,2n --parallel ${task.cpus} | \
-        bgzip -c -@ ${task.cpus} > ${meta.alias}.wf_mods.${label}bedmethyl.gz
+        bgzip -c -@ ${task.cpus} > ${meta.alias}.mods.${label}bedmethyl.gz
     """
 }
 
@@ -119,7 +119,7 @@ process modkit_tobigwig {
         tuple path(ref), path(ref_idx), path(ref_cache), env(REF_PATH)
         tuple val(meta), val(group), path(bedmethyl), val(mod)
     output:
-        tuple val(meta), val(group), val(mod), path("${meta.alias}.wf_mods.*.bw")
+        tuple val(meta), val(group), val(mod), path("${meta.alias}.mods.*.bw")
     publishDir \
         path: "${params.out_dir}",
         mode: 'copy'
@@ -137,7 +137,7 @@ process modkit_tobigwig {
     // switch on inverted counting for negative strand if using force_strand
     def strand_values_arg = params.force_strand ? "--negative-strand-values" : ""
     """
-    zcat ${bedmethyl} | modkit bm tobigwig --sizes ${ref_idx} -t ${task.cpus} --mod-codes ${mod_code} ${strand_values_arg} - ${meta.alias}.wf_mods.${label}.bw
+    zcat ${bedmethyl} | modkit bm tobigwig --sizes ${ref_idx} -t ${task.cpus} --mod-codes ${mod_code} ${strand_values_arg} - ${meta.alias}.mods.${label}.bw
     """
 }
 

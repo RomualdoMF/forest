@@ -36,10 +36,10 @@ workflow bam {
         called = variantCall(bam_channel, reference, target, mosdepth_stats, optional_file, genome_build, chromosome_codes)
 
         // bcftools norm -m -any: splits multiallelic records and left-aligns
-        // indels, same treatment normalize_vcf gives the SNP VCF (see
+        // indels, same treatment normalize_vcf gives the SNV VCF (see
         // modules/local/common.nf) -- this becomes the always-published
-        // <alias>.wf_sv.vcf.gz, independent of --annotation, so the annotated
-        // output below (<alias>.wf_sv.annotated.vcf.gz) never shadows it under
+        // <alias>.sv.vcf.gz, independent of --annotation, so the annotated
+        // output below (<alias>.sv.annotated.vcf.gz) never shadows it under
         // the same filename.
         normalized = normalize_sv_vcf(reference.collect(), called.vcf.join(called.vcf_index), "sv").normalized_vcf
 
@@ -78,13 +78,13 @@ workflow bam {
             // scheduling-dependent): only reproduced on the CNV path, not the
             // structurally identical SV one, in the same run.
             vcf_for_annotation = normalized.map{ meta, vcf, tbi -> [meta, vcf, tbi, '*'] }
-            // annotate with fastVEP -- <alias>.wf_sv.annotated.vcf.gz
+            // annotate with fastVEP -- <alias>.sv.annotated.vcf.gz
             fastvep_vcf = annotate_sv_vcf(vcf_for_annotation, genome_build, "sv.annotated", reference.collect()).annot_vcf
 
             // optionally rank/annotate the SVs further with AnnotSV, and (on
             // top of that) write AnnotSV's own columns back into fastvep_vcf as
             // more INFO fields -- annotate_vcf_with_tsv reads fastvep_vcf and
-            // rewrites it under the SAME <alias>.wf_sv.annotated.vcf.gz name
+            // rewrites it under the SAME <alias>.sv.annotated.vcf.gz name
             // (not a separate file), so that filename always ends up being
             // "whatever annotation --annotation/--annotsv turned on", never two
             // competing files publishing under it.

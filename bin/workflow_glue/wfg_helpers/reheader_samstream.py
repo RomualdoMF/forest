@@ -22,7 +22,7 @@ this script will be called immediately after minimap2, any previous
 attempt to use minimap2 will lead to ambiguity. This would be the
 expected case where users have used wf-basecalling or wf-alignment to
 align a set of reads, only to realign them to another reference (eg.
-via wf-human-variation). Arguably, we should remove older references to
+via forest). Arguably, we should remove older references to
 minimap2 as they will have been invalidated by the call to bam2fq but
 removing PG records and sticking the PG chain back together seems more
 fraught with annoying future bugs than simply resolving conflicts.

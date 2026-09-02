@@ -3,7 +3,7 @@ include {
     make_chunks;
     pileup_variants;
     aggregate_pileup_variants;
-    select_het_snps;
+    select_het_snvs;
     phase_contig;
     cat_haplotagged_contigs;
     get_qual_filter;
@@ -18,15 +18,15 @@ include {
     getVersions;
     makeReport;
     post_clair_phase_contig;
-} from "../modules/local/wf-human-snp.nf"
+} from "../modules/local/wf-human-snv.nf"
 
 include {
-    haploblocks as haploblocks_snp;
+    haploblocks as haploblocks_snv;
     extract_not_haplotagged_contigs;
 } from '../modules/local/common.nf'
 
 // workflow module
-workflow snp {
+workflow snv {
     take:
         bam_channel
         bed
@@ -71,16 +71,16 @@ workflow snp {
             ref, pileup_variants.out.pileup_vcf_chunks.groupTuple(),
             make_chunks.out.contigs_file, cmd_file)
 
-        // Filter collated results to produce per-contig SNPs for phasing.
+        // Filter collated results to produce per-contig SNVs for phasing.
         // > Step 2
-        select_het_snps(
+        select_het_snvs(
             contigs,
             aggregate_pileup_variants.out.pileup_vcf,
             aggregate_pileup_variants.out.phase_qual)
 
         // Perform phasing for each contig.
         // `each` doesn't work with tuples, so we have to make the product ourselves
-        phase_inputs = select_het_snps.out.het_snps_vcf
+        phase_inputs = select_het_snvs.out.het_snps_vcf
             .combine(bam_channel).combine(ref)
         // > Step 3
         // > Step 4 (haplotagging is now done at the end of the workflow, rather than here)
@@ -162,7 +162,7 @@ workflow snp {
             candidate_beds.map {it->it[1] }.collect())
 
         // phased requires haplotagged bam to perform appropriate phasing
-        // perform internal phasing only if snp+phase is requested, but not sv.
+        // perform internal phasing only if snv+phase is requested, but not sv.
         // Otherwise use final joint phasing only.
         // reorg bam channel so it combines with variant channel without duplicate meta
         reorg_bam_channel = bam_channel.map{ bam, bai, meta -> [meta, bam, bai]}
@@ -217,7 +217,7 @@ workflow snp {
             merge_pileup_and_full_vars.out.merged_vcf
                 .map { meta, contig, vcf, tbi -> [meta, vcf]}
                 .set { final_vcfs }
-            // SNP only so we don't need these
+            // SNV only so we don't need these
             haplotagged_ctg_bams = Channel.empty()
             haplotagged_cat_xam = Channel.empty()
         }
@@ -234,9 +234,9 @@ workflow snp {
             cmd_file)
 
         if (params.phased){
-            hp_snp_blocks = haploblocks_snp(clair_final.vcf, 'snp')
+            hp_snv_blocks = haploblocks_snv(clair_final.vcf, 'snv')
         } else {
-            hp_snp_blocks = Channel.empty()
+            hp_snv_blocks = Channel.empty()
         }
 
         // Phase GVCF if requested
@@ -252,7 +252,7 @@ workflow snp {
         }
 
         // Define clair3 results, adding GVCF if needed
-        clair3_results = haplotagged_cat_xam.concat(clair_final.vcf.map{meta, vcf, tbi -> [vcf, tbi]}).concat(final_gvcf).concat(hp_snp_blocks)
+        clair3_results = haplotagged_cat_xam.concat(clair_final.vcf.map{meta, vcf, tbi -> [vcf, tbi]}).concat(final_gvcf).concat(hp_snv_blocks)
 
     emit:
         clair3_results = clair3_results
@@ -264,7 +264,7 @@ workflow snp {
 
 
 // Reporting workflow
-workflow report_snp {
+workflow report_snv {
     take:
         vcf_stats
         annotated_vcf
@@ -281,5 +281,5 @@ workflow report_snp {
 
     emit:
         report = makeReport.out.report
-        snp_stats_json = makeReport.out.json
+        snv_stats_json = makeReport.out.json
 }

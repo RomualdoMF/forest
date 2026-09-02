@@ -1,7 +1,7 @@
 include {
     callCNV;
     getVersions;
-    add_snp_tools_to_versions;
+    add_snv_tools_to_versions;
     bgzip_and_index_vcf;
     makeReport
 } from "../modules/local/wf-human-cnv.nf"
@@ -50,10 +50,10 @@ workflow cnv {
         spectre_bed = cnvs.spectre_bed
         spectre_karyotype = cnvs.spectre_karyotype
 
-        // bcftools norm -m -any: same treatment normalize_vcf gives the SNP/SV
+        // bcftools norm -m -any: same treatment normalize_vcf gives the SNV/SV
         // VCFs (see modules/local/common.nf) -- this becomes the
-        // always-published <alias>.wf_cnv.vcf.gz, independent of --annotation,
-        // so the annotated output below (<alias>.wf_cnv.annotated.vcf.gz) never
+        // always-published <alias>.cnv.vcf.gz, independent of --annotation,
+        // so the annotated output below (<alias>.cnv.annotated.vcf.gz) never
         // shadows it under the same filename.
         normalized = normalize_cnv_vcf(ref.collect(), spectre_vcf_bgzipped, "cnv").normalized_vcf
 
@@ -80,15 +80,15 @@ workflow cnv {
             // scheduling-dependent): only reproduced on the CNV path, not the
             // structurally identical SV one, in the same run.
             vcf_for_annotation = normalized.map{ meta, vcf, tbi -> [meta, vcf, tbi, '*'] }
-            // annotate with fastVEP -- <alias>.wf_cnv.annotated.vcf.gz
+            // annotate with fastVEP -- <alias>.cnv.annotated.vcf.gz
             fastvep_vcf = annotate_vcf(vcf_for_annotation, genome_build, "cnv.annotated", ref.collect()).annot_vcf
 
             // optionally rank/annotate the CNVs further with AnnotSV, and (on top
             // of that) run the ISV/ClassifyCNV ensemble on AnnotSV's output --
             // when the ensemble step also runs it writes AnnotSV+ISV+ClassifyCNV
             // columns back into fastvep_vcf under the SAME
-            // <alias>.wf_cnv.annotated.vcf.gz name (not a separate file); AnnotSV
-            // alone (no ensemble) only produces the .wf_cnv.annotsv.tsv, same as
+            // <alias>.cnv.annotated.vcf.gz name (not a separate file); AnnotSV
+            // alone (no ensemble) only produces the .cnv.annotsv.tsv, same as
             // before -- the VCF itself stays fastVEP-only in that case.
             if (params.annotsv) {
                 annotsv_result = annotsv(fastvep_vcf, genome_build, "cnv").annotsv_tsv
@@ -110,7 +110,7 @@ workflow cnv {
         }
 
         software_versions_tmp = getVersions()
-        software_versions = add_snp_tools_to_versions(software_versions_tmp)
+        software_versions = add_snv_tools_to_versions(software_versions_tmp)
         if (params.output_report){
             report = makeReport(software_versions.collect(), workflow_params, spectre_bed, spectre_karyotype, genome_build)
         } else {

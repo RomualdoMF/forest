@@ -84,7 +84,7 @@ body:
     attributes:
       label: CLI command run
       description: Please tell us the command you are running
-      placeholder: e.g. nextflow run epi2me-labs/wf-human-variations -profile standard --fastq my-reads/fastq
+      placeholder: e.g. nextflow run forest -profile standard --fastq my-reads/fastq
     validations:
       required: false
   - type: dropdown

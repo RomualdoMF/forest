@@ -1,7 +1,7 @@
 // CNV classification ensemble: runs ISV + ClassifyCNV on top of AnnotSV's
-// .wf_cnv.annotsv.tsv, merges everything into .wf_cnv.annotated.tsv, and
-// writes the same columns back into the original .wf_cnv.vcf.gz as INFO
-// fields, producing .wf_cnv.annotated.vcf.gz.
+// .cnv.annotsv.tsv, merges everything into .cnv.annotated.tsv, and
+// writes the same columns back into the original .cnv.vcf.gz as INFO
+// fields, producing .cnv.annotated.vcf.gz.
 //
 // Split into two processes/containers on purpose:
 //   - run_cnv_ensemble (label "cnv_ensemble", bin/cnv_ensemble_classify.py):
@@ -32,9 +32,9 @@ process run_cnv_ensemble {
         tuple val(xam_meta), path("input.annotsv.tsv")
         val(genome)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_cnv.annotated.tsv"), emit: annotated_tsv, optional: true
+        tuple val(xam_meta), path("${xam_meta.alias}.cnv.annotated.tsv"), emit: annotated_tsv, optional: true
     script:
-        def tsv_name = "${xam_meta.alias}.wf_cnv.annotated.tsv"
+        def tsv_name = "${xam_meta.alias}.cnv.annotated.tsv"
         """
         if [[ "${genome}" == "hg38" ]] || [[ "${genome}" == "hg19" ]]; then
             cnv_ensemble_classify.py \
@@ -49,8 +49,8 @@ process run_cnv_ensemble {
 
 workflow cnv_ensemble {
     take:
-        annotsv_tuple  // tuple(xam_meta, <sample>.wf_cnv.annotsv.tsv)
-        cnv_vcf_tuple  // tuple(xam_meta, <sample>.wf_cnv.vcf.gz, .tbi) -- the VCF AnnotSV was run on
+        annotsv_tuple  // tuple(xam_meta, <sample>.cnv.annotsv.tsv)
+        cnv_vcf_tuple  // tuple(xam_meta, <sample>.cnv.vcf.gz, .tbi) -- the VCF AnnotSV was run on
         genome         // "hg38" / "hg19" / other
     main:
         tsv_result = run_cnv_ensemble(annotsv_tuple, genome).annotated_tsv

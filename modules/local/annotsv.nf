@@ -1,6 +1,6 @@
 // AnnotSV (https://github.com/lgmgeo/AnnotSV) annotation/ranking for structural
-// variants and CNVs. Runs on the already VEP-annotated .wf_sv.vcf.gz (from
-// wf-human-sv) and .wf_cnv.vcf.gz (from wf-human-cnv). Optional feature, off by
+// variants and CNVs. Runs on the already VEP-annotated .sv.vcf.gz (from
+// wf-human-sv) and .cnv.vcf.gz (from wf-human-cnv). Optional feature, off by
 // default (params.annotsv).
 //
 // Like the VEP cache, the human annotation data (~5GB, Annotations_Human_*.tar.gz)
@@ -76,13 +76,13 @@ process run_annotsv {
     input:
         tuple val(xam_meta), path("input.vcf.gz"), path("input.vcf.gz.tbi")
         val(genome)
-        val(output_label)  // e.g. "sv", "cnv" -- becomes "<alias>.wf_<label>.annotsv.tsv"
+        val(output_label)  // e.g. "sv", "cnv" -- becomes "<alias>.<label>.annotsv.tsv"
         val(annotations_ready)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_${output_label}.annotsv.tsv"), emit: annotsv_tsv, optional: true
+        tuple val(xam_meta), path("${xam_meta.alias}.${output_label}.annotsv.tsv"), emit: annotsv_tsv, optional: true
     script:
         def build = genome == 'hg19' ? 'GRCh37' : 'GRCh38'
-        def out_name = "${xam_meta.alias}.wf_${output_label}.annotsv.tsv"
+        def out_name = "${xam_meta.alias}.${output_label}.annotsv.tsv"
         // per-label extra AnnotSV flags (raw tokens, appended as-is) -- e.g.
         // params.annotsv_sv_custom_args = ["-vcf", "1"]
         def custom_args = (output_label == 'sv' ? params.annotsv_sv_custom_args : params.annotsv_cnv_custom_args).join(' ')
@@ -106,9 +106,9 @@ process annotate_vcf_with_tsv {
     // derived from as INFO fields -- see bin/annotate_vcf_from_annotsv.py.
     // Called two ways:
     //   - workflows/wf-human-sv.nf: directly on AnnotSV's own raw
-    //     <sample>.wf_sv.annotsv.tsv (no ensemble step for SV).
+    //     <sample>.sv.annotsv.tsv (no ensemble step for SV).
     //   - modules/local/cnv_ensemble.nf: on the ISV/ClassifyCNV-merged
-    //     <sample>.wf_cnv.annotated.tsv instead (a superset of AnnotSV's own
+    //     <sample>.cnv.annotated.tsv instead (a superset of AnnotSV's own
     //     columns) -- annotate_vcf_from_annotsv.py auto-detects which shape
     //     of TSV it was given.
     // label "wf_common" (not "annotsv"): only needs pysam, which the
@@ -124,11 +124,11 @@ process annotate_vcf_with_tsv {
     input:
         tuple val(xam_meta), path("input.annotated.tsv")
         tuple val(xam_meta2), path("input.vcf.gz"), path("input.vcf.gz.tbi")
-        val(output_label)  // "sv" or "cnv" -- becomes "<alias>.wf_<label>.annotated.vcf.gz"
+        val(output_label)  // "sv" or "cnv" -- becomes "<alias>.<label>.annotated.vcf.gz"
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_${output_label}.annotated.vcf.gz"), path("${xam_meta.alias}.wf_${output_label}.annotated.vcf.gz.tbi"), emit: annotated_vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.${output_label}.annotated.vcf.gz"), path("${xam_meta.alias}.${output_label}.annotated.vcf.gz.tbi"), emit: annotated_vcf
     script:
-        def vcf_name = "${xam_meta.alias}.wf_${output_label}.annotated.vcf.gz"
+        def vcf_name = "${xam_meta.alias}.${output_label}.annotated.vcf.gz"
         """
         annotate_vcf_from_annotsv.py \
             --annotated-tsv input.annotated.tsv \
@@ -140,7 +140,7 @@ process annotate_vcf_with_tsv {
 
 workflow annotsv {
     take:
-        vcf_tuple     // tuple(xam_meta, vcf.gz, vcf.gz.tbi) -- .wf_sv.vcf.gz or .wf_cnv.vcf.gz
+        vcf_tuple     // tuple(xam_meta, vcf.gz, vcf.gz.tbi) -- .sv.vcf.gz or .cnv.vcf.gz
         genome        // "hg38" / "hg19" / other
         output_label  // "sv" or "cnv"
     main:

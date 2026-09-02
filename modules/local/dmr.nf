@@ -235,12 +235,12 @@ process aggregate_dmrs {
         path(chr_dmr_files)
         path(status_logs)
     output:
-        tuple val(alias), val(comparison_label), val(mod_char), path("${alias}.wf_mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_table.tsv"), emit: dmr_table
-        path("${alias}.wf_mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_status.log"), emit: status_log
+        tuple val(alias), val(comparison_label), val(mod_char), path("${alias}.mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_table.tsv"), emit: dmr_table
+        path("${alias}.mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_status.log"), emit: status_log
     script:
         def out_label = (mod_char == 'h' ? '5hmC' : '5mC')
-        def table_name = "${alias}.wf_mods.${comparison_label}.${out_label}.dmr_table.tsv"
-        def log_name = "${alias}.wf_mods.${comparison_label}.${out_label}.dmr_status.log"
+        def table_name = "${alias}.mods.${comparison_label}.${out_label}.dmr_table.tsv"
+        def log_name = "${alias}.mods.${comparison_label}.${out_label}.dmr_status.log"
         """
         echo -e "chr\\tstart\\tend\\tlength\\tnCG\\tmeanMethy1\\tmeanMethy2\\tdiff.Methy\\tareaStat" > "${table_name}"
         for dmr_file in dmrs_*.bed; do
@@ -275,14 +275,14 @@ process annotate_dmrs {
         val(annotations_ready)
         val(imprinted_only)
     output:
-        tuple val(alias), val(comparison_label), val(mod_char), path("${alias}.wf_mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_annotated.tsv"), emit: annotated
-        path("${alias}.wf_mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_annotation.log"), emit: annotation_log
+        tuple val(alias), val(comparison_label), val(mod_char), path("${alias}.mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_annotated.tsv"), emit: annotated
+        path("${alias}.mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_annotation.log"), emit: annotation_log
     script:
         def out_label = (mod_char == 'h' ? '5hmC' : '5mC')
         def annotation_bed = "${params.dmr_annotations_dir}/annotations/gencode.v46.annotation.exon-promoters-introns.sorted.bed"
         def imprinted_tsv = "${params.dmr_annotations_dir}/annotations/imprinted_genes.tsv"
-        def out_name = "${alias}.wf_mods.${comparison_label}.${out_label}.dmr_annotated.tsv"
-        def log_name = "${alias}.wf_mods.${comparison_label}.${out_label}.dmr_annotation.log"
+        def out_name = "${alias}.mods.${comparison_label}.${out_label}.dmr_annotated.tsv"
+        def log_name = "${alias}.mods.${comparison_label}.${out_label}.dmr_annotation.log"
         """
         echo -e 'chr\\tstart\\tend\\tlength\\tnCG\\tmeanMethy1\\tmeanMethy2\\tdiff.Methy\\tareaStat\\tannotation_chr\\tannotation_start\\tannotation_end\\tstrand\\tannotation\\tbiotype\\tgene' > annotation_header.txt
 
@@ -353,10 +353,10 @@ process report_dmrs {
         tuple val(alias), val(comparison_label), val(mod_char), path(annotated_tsv)
         path(annotation_log)
     output:
-        path("${alias}.wf_mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_report.html"), emit: report
+        path("${alias}.mods.${comparison_label}.${mod_char == 'h' ? '5hmC' : '5mC'}.dmr_report.html"), emit: report
     script:
         def out_label = (mod_char == 'h' ? '5hmC' : '5mC')
-        def out_name = "${alias}.wf_mods.${comparison_label}.${out_label}.dmr_report.html"
+        def out_name = "${alias}.mods.${comparison_label}.${out_label}.dmr_report.html"
         """
 #!/usr/bin/env python
 import os
@@ -506,7 +506,7 @@ process plot_dmr_modbamtools {
         while IFS=\$'\\t' read -r chr start end length nCG meanMethy1 meanMethy2 diffMethy areaStat annotation_chr annotation_start annotation_end strand annotation biotype gene; do
             if [[ ! -s "\${genes_of_interest}" ]] || grep -q -w "\${gene}" "\${genes_of_interest}"; then
                 region="\${chr}:\${start}-\${end}"
-                output_prefix="${alias}.wf_mods.${comparison_label}.\${chr}_\${start}-\${end}_\${gene}"
+                output_prefix="${alias}.mods.${comparison_label}.\${chr}_\${start}-\${end}_\${gene}"
                 if modbamtools plot -r \${region} -g ${gtf_file} \\
                     -s ${bam1.baseName},${bam2.baseName} -p \${output_prefix} ${bam1} ${bam2} -o ./; then
                     echo \$(( \$(cat plot_count.tmp) + 1 )) > plot_count.tmp
@@ -552,7 +552,7 @@ process plot_dmr_methylartist {
         while IFS=\$'\\t' read -r chr start end length nCG meanMethy1 meanMethy2 diffMethy areaStat annotation_chr annotation_start annotation_end strand annotation biotype gene; do
             if [[ ! -s "\${genes_of_interest}" ]] || grep -q -w "\${gene}" "\${genes_of_interest}"; then
                 region="\${chr}:\${start}-\${end}"
-                output_prefix="${alias}.wf_mods.${comparison_label}.\${chr}_\${start}-\${end}_\${gene}"
+                output_prefix="${alias}.mods.${comparison_label}.\${chr}_\${start}-\${end}_\${gene}"
                 if methylartist locus --interval \${region} --gtf ${gtf_file} \\
                     --bams ${bam1},${bam2} --ref ${ref} --motif CG --mods ${mod_flag} \\
                     --outfile \${output_prefix} --labelgenes --nomask; then
@@ -600,7 +600,7 @@ process plot_phased_dmr_modbamtools {
         while IFS=\$'\\t' read -r chr start end length nCG meanMethy1 meanMethy2 diffMethy areaStat annotation_chr annotation_start annotation_end strand annotation biotype gene; do
             if [[ ! -s "\${genes_of_interest}" ]] || grep -q -w "\${gene}" "\${genes_of_interest}"; then
                 region="\${chr}:\${start}-\${end}"
-                output_prefix="${alias}.wf_mods.${comparison_label}.\${chr}_\${start}-\${end}_\${gene}"
+                output_prefix="${alias}.mods.${comparison_label}.\${chr}_\${start}-\${end}_\${gene}"
                 if modbamtools plot -r \${region} -g ${gtf_file} \\
                     -s ${bam.baseName} -p \${output_prefix} -hp ${bam} -o ./; then
                     echo \$(( \$(cat plot_count.tmp) + 1 )) > plot_count.tmp
@@ -645,7 +645,7 @@ process plot_phased_dmr_methylartist {
         while IFS=\$'\\t' read -r chr start end length nCG meanMethy1 meanMethy2 diffMethy areaStat annotation_chr annotation_start annotation_end strand annotation biotype gene; do
             if [[ ! -s "\${genes_of_interest}" ]] || grep -q -w "\${gene}" "\${genes_of_interest}"; then
                 region="\${chr}:\${start}-\${end}"
-                output_prefix="${alias}.wf_mods.${comparison_label}.\${chr}_\${start}-\${end}_\${gene}"
+                output_prefix="${alias}.mods.${comparison_label}.\${chr}_\${start}-\${end}_\${gene}"
                 if methylartist locus --interval \${region} --gtf ${gtf_file} \\
                     --bams ${bam} --ref ${ref} --motif CG --mods ${mod_flag} \\
                     --outfile \${output_prefix} --labelgenes --nomask --phased --ignore_ps; then

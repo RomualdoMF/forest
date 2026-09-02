@@ -2,8 +2,8 @@
 
 nextflow.enable.dsl = 2
 
-include { snp; report_snp } from './workflows/wf-human-snp'
-include { lookup_clair3_model } from './modules/local/wf-human-snp'
+include { snv; report_snv } from './workflows/wf-human-snv'
+include { lookup_clair3_model } from './modules/local/wf-human-snv'
 
 include { bam as sv } from './workflows/wf-human-sv'
 include { output_sv } from './modules/local/wf-human-sv'
@@ -34,9 +34,9 @@ include {
     getGenome;
     eval_downsampling;
     downsampling;
-    concat_vcfs as concat_snp_vcfs;
-    concat_vcfs as concat_refined_snp;
-    normalize_vcf as normalize_snp_vcf;
+    concat_vcfs as concat_snv_vcfs;
+    concat_vcfs as concat_refined_snv;
+    normalize_vcf as normalize_snv_vcf;
     bed_filter;
     sanitise_bed;
     sanitise_bed as sanitise_coverage_bed;
@@ -47,12 +47,12 @@ include {
 } from './modules/local/common'
 
 include {
-    annotate_vcf as annotate_snp_vcf;
+    annotate_vcf as annotate_snv_vcf;
 } from './modules/local/vep'
 
 include {
     tapes_classify;
-    annotate_snp_vcf_with_tapes;
+    annotate_snv_vcf_with_tapes;
 } from './modules/local/tapes'
 
 include {
@@ -79,9 +79,9 @@ include {
 include {
     refine_with_sv;
     vcfStats;
-    output_snp;
-    filter_snp_vcf_by_qual_dp;
-} from "./modules/local/wf-human-snp.nf"
+    output_snv;
+    filter_snv_vcf_by_qual_dp;
+} from "./modules/local/wf-human-snv.nf"
 
 include {
     mod;
@@ -110,11 +110,11 @@ workflow {
     can_start = true
 
     // Check if it is in genotyping mode
-    if (params.snp && params.vcf_fn) {
+    if (params.snv && params.vcf_fn) {
         if (params.bed){
             throw new Exception(colors.red + "Clair3 cannot run with both --vcf_fn and --bed." + colors.reset)
         }
-        log.warn ("Running Clair3 in genotyping mode with --vcf_fn will override --snp_min_af and --indel_min_af to 0.0.")
+        log.warn ("Running Clair3 in genotyping mode with --vcf_fn will override --snv_min_af and --indel_min_af to 0.0.")
     }
 
     // check SV calling will be done when benchmarking SV calls
@@ -201,9 +201,9 @@ workflow {
     }
 
     // TAPES ACMG classification (see modules/local/tapes.nf) consumes the VEP-annotated
-    // SNP VCF directly, so it can't run without annotation.
+    // SNV VCF directly, so it can't run without annotation.
     if (params.tapes && !params.annotation) {
-        throw new Exception(colors.red + "--tapes requires --annotation (TAPES classifies the VEP-annotated SNP VCF)." + colors.reset)
+        throw new Exception(colors.red + "--tapes requires --annotation (TAPES classifies the VEP-annotated SNV VCF)." + colors.reset)
     }
 
     // Combine data for partners
@@ -241,8 +241,8 @@ workflow {
         log.warn "You do not need to do anything, but any alignment or realignment will ignore your CRAM selection and be written as BAM to maintain compatibility with QDNAseq."
     }
 
-    // Trigger the SNP workflow based on a range of different conditions:
-    def run_snp = params.snp || run_haplotagging || (params.cnv && !params.use_qdnaseq)
+    // Trigger the SNV workflow based on a range of different conditions:
+    def run_snv = params.snv || run_haplotagging || (params.cnv && !params.use_qdnaseq)
 
     reference = prepare_reference([
         "input_ref": params.ref,
@@ -289,9 +289,9 @@ workflow {
         // always check genome build for CNV and STR subworkflows
         // getGenome will take care of checking which build is required for STR
         (params.cnv || params.str) \
-        // or if annotating, check genome build when using SNP, SV or phasing
+        // or if annotating, check genome build when using SNV, SV or phasing
         // as SnpEff annotations are only provided for hg19 and hg38
-        || (params.annotation && (params.snp || params.sv || params.phased))
+        || (params.annotation && (params.snv || params.sv || params.phased))
 
     // Check if the genome build in the BAM is suitable for any workflows that have restrictions
     // NOTE getGenome will cause the workflow to terminate if the build is neither hg19 or hg38
@@ -372,7 +372,7 @@ workflow {
         coverage_bed = Channel.fromPath("$projectDir/data/OPTIONAL_FILE")
     }
 
-    // mosdepth for depth traces -- passed into wf-snp :/
+    // mosdepth for depth traces -- passed into wf-snv :/
 
     mosdepth_input(bam_channel, bed, ref_channel, params.depth_window_size, create_bed_summary, "bed")
     mosdepth_stats = mosdepth_input.out.mosdepth_tuple
@@ -707,15 +707,15 @@ workflow {
         report_fail = Channel.empty()
     }
 
-    // Set up BED for wf-human-snp, wf-human-str or run_haplotagging
-    // CW-2383: we first call the SNPs to generate an haplotagged bam file for downstream analyses
-    if (run_snp) {
+    // Set up BED for wf-human-snv, wf-human-str or run_haplotagging
+    // CW-2383: we first call the SNVs to generate an haplotagged bam file for downstream analyses
+    if (run_snv) {
         if(using_user_bed) {
-            snp_bed = bed
+            snv_bed = bed
         }
         else {
-            // wf-human-snp uses OPTIONAL_FILE for empty bed for legacy reasons
-            snp_bed = Channel.fromPath("${projectDir}/data/OPTIONAL_FILE", checkIfExists: true)
+            // wf-human-snv uses OPTIONAL_FILE for empty bed for legacy reasons
+            snv_bed = Channel.fromPath("${projectDir}/data/OPTIONAL_FILE", checkIfExists: true)
         }
 
         if(params.clair3_model_path) {
@@ -745,9 +745,9 @@ workflow {
             }
         }
 
-        clair_vcf = snp(
+        clair_vcf = snv(
             pass_bam_channel,
-            snp_bed,
+            snv_bed,
             ref_channel,
             clair3_model,
             genome_build,
@@ -791,12 +791,12 @@ workflow {
         sniffles_vcf = Channel.fromPath("${projectDir}/data/OPTIONAL_FILE", checkIfExists: true)
     }
 
-    // Then, we finish working on the SNPs by refining with SVs and annotating them. This is needed to
+    // Then, we finish working on the SNVs by refining with SVs and annotating them. This is needed to
     // maximise the interaction between Clair3 and Sniffles.
-    if (run_snp){
+    if (run_snv){
         // Channel of results.
-        // We drop the raw .vcf(.tbi) file from Clair3 in it to then add back the files in the 
-        // snp_vcf channel, allowing for the latest file to be emitted.
+        // We drop the raw .vcf(.tbi) file from Clair3 in it to then add back the files in the
+        // snv_vcf channel, allowing for the latest file to be emitted.
         // Channel structure is
         /*  [
         *   [CRAM, CRAI]
@@ -814,48 +814,48 @@ workflow {
 
         // Define which bam to use for final refinement
         if (run_haplotagging){
-            snp_refinement_xam = clair_vcf.haplotagged_xam
+            snv_refinement_xam = clair_vcf.haplotagged_xam
         } else {
-            snp_refinement_xam = pass_bam_channel
+            snv_refinement_xam = pass_bam_channel
         }
 
-        // Refine the SNP phase using SVs from Sniffles
-        if (params.refine_snp_with_sv && params.sv){
+        // Refine the SNV phase using SVs from Sniffles
+        if (params.refine_snv_with_sv && params.sv){
             // Run by chromosome to reduce memory usage
-            // Use collect on the reference, the SNP VCF
-            // and the SV VCFs to ensure running on each contig. 
-            refined_snps = refine_with_sv(
+            // Use collect on the reference, the SNV VCF
+            // and the SV VCFs to ensure running on each contig.
+            refined_snvs = refine_with_sv(
                 ref_channel.collect(),
                 clair_vcf.vcf_files.combine(clair_vcf.contigs),
-                snp_refinement_xam | first,
+                snv_refinement_xam | first,
                 sniffles_vcf.map{meta, vcf -> vcf}.collect()
             )
-            final_snp_vcf = concat_refined_snp(
-                refined_snps.map{ meta, vcf, tbi -> [meta, vcf]}.groupTuple(),
-                "wf_snp"
+            final_snv_vcf = concat_refined_snv(
+                refined_snvs.map{ meta, vcf, tbi -> [meta, vcf]}.groupTuple(),
+                "snv"
             )
         } else {
             // If refine_with_sv not requested, passthrough
-            final_snp_vcf = clair_vcf.vcf_files
+            final_snv_vcf = clair_vcf.vcf_files
         }
 
         // Filter by BED, if provided
         if (params.bed) {
-            final_snp_vcf_filtered = bed_filter(final_snp_vcf, roi_filter_bed, "snp", "vcf").filtered
+            final_snv_vcf_filtered = bed_filter(final_snv_vcf, roi_filter_bed, "snv", "vcf").filtered
         }
         else {
-            final_snp_vcf_filtered = final_snp_vcf
+            final_snv_vcf_filtered = final_snv_vcf
         }
 
         // Real QUAL/DP filter (params.vcf_snv_min_qual/vcf_snv_min_dp), independent
-        // of --annotation -- see filter_snp_vcf_by_qual_dp in
-        // modules/local/wf-human-snp.nf for why this exists as its own explicit
+        // of --annotation -- see filter_snv_vcf_by_qual_dp in
+        // modules/local/wf-human-snv.nf for why this exists as its own explicit
         // step instead of relying on params.min_qual/min_cov.
-        final_snp_vcf_filtered = filter_snp_vcf_by_qual_dp(final_snp_vcf_filtered).filtered
+        final_snv_vcf_filtered = filter_snv_vcf_by_qual_dp(final_snv_vcf_filtered).filtered
 
         // Run annotation, when requested.
         if (!params.annotation) {
-            snp_vcf = final_snp_vcf_filtered
+            snv_vcf = final_snv_vcf_filtered
             // no annotated VCF, pass empty VCF to makeReport
             annotated_vcf = Channel.fromPath("${projectDir}/data/empty_clinvar.vcf")
             // no annotation means no TAPES either (validated at the top of the workflow)
@@ -864,37 +864,37 @@ workflow {
         }
         else {
             // bcftools norm -m- splits multiallelic records (and left-aligns indels)
-            // before anything downstream touches the SNP VCF -- VEP's own per-transcript
+            // before anything downstream touches the SNV VCF -- VEP's own per-transcript
             // CSQ blocks cope with multiallelic records fine, but TAPES doesn't (see
             // normalize_vcf in modules/local/common.nf for the full story). This
-            // normalized VCF is what gets published as wf_snp.vcf.gz now; the
-            // VEP/TAPES-annotated one below is wf_snp.annotated.vcf.gz instead.
-            snp_vcf = normalize_snp_vcf(ref_channel.collect(), final_snp_vcf_filtered, "snp").normalized_vcf
+            // normalized VCF is what gets published as snv.vcf.gz now; the
+            // VEP/TAPES-annotated one below is snv.annotated.vcf.gz instead.
+            snv_vcf = normalize_snv_vcf(ref_channel.collect(), final_snv_vcf_filtered, "snv").normalized_vcf
 
             // do annotation (functional consequences + supplementary annotation +
             // ACMG classification, all via fastVEP) -- annotate per contig for
             // parallelism, same as the VEP step this replaces
-            annotations = annotate_snp_vcf(
-                snp_vcf.combine(clair_vcf.contigs), genome_build.first(), "snp", ref_channel.collect()
+            annotations = annotate_snv_vcf(
+                snv_vcf.combine(clair_vcf.contigs), genome_build.first(), "snv", ref_channel.collect()
             )
-            vep_annotated_vcf = concat_snp_vcfs(annotations.map{ meta, vcf, tbi -> [meta,vcf]}.groupTuple(), "wf_snp.annotated").final_vcf
+            vep_annotated_vcf = concat_snv_vcfs(annotations.map{ meta, vcf, tbi -> [meta,vcf]}.groupTuple(), "snv.annotated").final_vcf
 
             // TAPES ACMG classification (see modules/local/tapes.nf), run per-contig on
             // the same pre-concat `annotations` channel above, then merged into one table.
             if (params.tapes) {
                 tapes_table = tapes_classify(annotations, genome_build.first()).table
                 // inject TAPES' Probability_Path/Prediction_ACMG_tapes columns back into
-                // the VEP-annotated VCF as INFO fields -- published wf_snp.annotated.vcf.gz
-                // either way (see annotate_snp_vcf_with_tapes in modules/local/tapes.nf).
-                tapes_annotated_vcf = annotate_snp_vcf_with_tapes(vep_annotated_vcf, tapes_table).annotated_vcf
+                // the VEP-annotated VCF as INFO fields -- published snv.annotated.vcf.gz
+                // either way (see annotate_snv_vcf_with_tapes in modules/local/tapes.nf).
+                tapes_annotated_vcf = annotate_snv_vcf_with_tapes(vep_annotated_vcf, tapes_table).annotated_vcf
                 // Fallback when TAPES produces nothing: TAPES' ACMG engine (a fork tuned
                 // for Ensembl VEP's plugin-appended CSQ subfields) doesn't recognise
                 // fastVEP's annotations, which live in separate FV_*-prefixed INFO fields
                 // instead of being folded into CSQ -- it exits 0 with "All required
                 // annotations not found" on every contig, so
-                // run_tapes/merge_tapes/annotate_snp_vcf_with_tapes never actually produce
+                // run_tapes/merge_tapes/annotate_snv_vcf_with_tapes never actually produce
                 // a value and this whole branch would otherwise starve silently (no
-                // wf_snp.annotated.vcf.gz, no SNP report -- the pipeline still reports
+                // snv.annotated.vcf.gz, no SNV report -- the pipeline still reports
                 // success). `.join(..., remainder: true)` keyed on xam_meta lets the
                 // fastVEP-only VCF through whenever the TAPES side never shows up, for
                 // whatever reason, instead of hard-blocking on it.
@@ -924,32 +924,32 @@ workflow {
             }
 
             // the report extracts ClinVar rows itself from the VEP CSQ field
-            // of the full annotated VCF (see report_snp.py, load_vep_clinvar_vcf)
+            // of the full annotated VCF (see report_snv.py, load_vep_clinvar_vcf)
             annotated_vcf = annotated_vcf_tuple.map{ meta, vcf, tbi -> vcf }
         }
 
         // Run vcf statistics on the final VCF file
-        vcf_stats = vcfStats(snp_vcf)
+        vcf_stats = vcfStats(snv_vcf)
 
         // Prepare the report
-        snp_reporting = report_snp(vcf_stats, annotated_vcf, workflow_params)
-        json_snp = snp_reporting.snp_stats_json
+        snv_reporting = report_snv(vcf_stats, annotated_vcf, workflow_params)
+        json_snv = snv_reporting.snv_stats_json
         if (params.output_report){
-            snp_report = snp_reporting.report
+            snv_report = snv_reporting.report
         } else {
-            snp_report = Channel.empty()
+            snv_report = Channel.empty()
         }
 
-        // Output for SNP
-        snp_report
+        // Output for SNV
+        snv_report
             .concat(clair3_results)
-            .concat(snp_vcf.map{meta, vcf, tbi -> [vcf, tbi]})
+            .concat(snv_vcf.map{meta, vcf, tbi -> [vcf, tbi]})
             .concat(annotated_vcf_tuple.map{meta, vcf, tbi -> [vcf, tbi]})
             .concat(tapes_table)
-            .flatten() | output_snp
+            .flatten() | output_snv
     } else {
-        json_snp = Channel.empty()
-        snp_vcf = Channel.empty()
+        json_snv = Channel.empty()
+        snv_vcf = Channel.empty()
     }
 
     // wf-human-mod
@@ -1072,7 +1072,7 @@ workflow {
 
     // wf-human-str
     if (params.str) {
-        // use haplotagged bam from snp() as input to str()
+        // use haplotagged bam from snv() as input to str()
         bam_channel_str = clair_vcf.str_bams
 
         results_str = str(
@@ -1101,7 +1101,7 @@ workflow {
     // Combine into a final JSON of analyses stats
     analyses_jsons = Channel.empty()
         | mix(
-            json_snp,
+            json_snv,
             json_sv
         )
         | collect
@@ -1120,7 +1120,7 @@ workflow {
     // If the workflow is set to run for the partner, then execute the merging
     if (run_partners){
         partners(
-            snp_vcf,
+            snv_vcf,
             sv_vcf,
             cnv_vcf,
             str_vcf,
@@ -1157,7 +1157,7 @@ workflow {
                         ] 
                     }
                 ),
-                snp_vcf | map { meta, vcf, tbi -> [vcf, tbi] },
+                snv_vcf | map { meta, vcf, tbi -> [vcf, tbi] },
                 sv_vcf | map { meta, vcf, tbi -> [vcf, tbi] },
                 str_vcf | map { meta, vcf, tbi -> [vcf, tbi] },
                 cnv_vcf | map { meta, vcf, tbi -> [vcf, tbi] },

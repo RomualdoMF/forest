@@ -30,12 +30,12 @@ Nextflow and provide a list of all parameters
 available for the workflow as well as an example command:
 
 ```
-nextflow run epi2me-labs/wf-human-variation --help
+nextflow run forest --help
 ```
 To update a workflow to the latest version on the command line use
 the following command:
 ```
-nextflow pull epi2me-labs/wf-human-variation
+nextflow pull RomualdoMF/forest
 ```
 
 A demo dataset is provided for testing of the workflow.
@@ -46,12 +46,12 @@ tar -xzvf wf-human-variation-demo.tar.gz
 ```
 The workflow can then be run with the downloaded demo data using:
 ```
-nextflow run epi2me-labs/wf-human-variation \
+nextflow run forest \
 	--bam 'wf-human-variation-demo/demo.bam' \
 	--ref 'wf-human-variation-demo/demo.fasta' \
 	--bed 'wf-human-variation-demo/demo.bed' \
 	--sample_name 'DEMO' \
-	--snp \
+	--snv \
 	--sv \
 	--mod \
 	--phased \

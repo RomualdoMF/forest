@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Run an ensemble of CNV annotation/classification tools on top of AnnotSV output.
 
-Takes a `<sample>.wf_cnv.annotsv.tsv` (produced by AnnotSV, see
+Takes a `<sample>.cnv.annotsv.tsv` (produced by AnnotSV, see
 modules/local/annotsv.nf) and runs it through:
   - ISV        https://github.com/tsladecek/isv_package  (annotate + predict)
   - ClassifyCNV https://github.com/Genotek/ClassifyCNV
 
 then merges the AnnotSV columns with each tool's output columns (each set
-prefixed with the tool's name) into a single `<sample>.wf_cnv.annotated.tsv`.
+prefixed with the tool's name) into a single `<sample>.cnv.annotated.tsv`.
 The first four (unprefixed) columns of the output are the canonical
 coordinates -- Chr, Start, Stop, Type -- taken from AnnotSV; every other
 column is prefixed AnnotSV_ / ISV_ / ClassifyCNV_ and rows are joined back on
@@ -15,8 +15,8 @@ those four canonical columns (not on row order), so a tool dropping a CNV
 (e.g. ClassifyCNV skips alt-contig / zero-length CNVs) just leaves NaNs for
 that tool's columns rather than desynchronising the table.
 
-Writing those same columns back into the original .wf_cnv.vcf.gz as INFO
-fields (producing .wf_cnv.annotated.vcf.gz) is a separate script,
+Writing those same columns back into the original .cnv.vcf.gz as INFO
+fields (producing .cnv.annotated.vcf.gz) is a separate script,
 bin/annotate_cnv_vcf.py -- deliberately not done here, see that script's
 docstring for why.
 
@@ -53,10 +53,10 @@ Setup (only needed to run this standalone, outside the pipeline container)
 Usage
 --------------------------------------------------------------------------
     cnv_ensemble_classify.py \
-        --annotsv-tsv OMICS_09.wf_cnv.annotsv.tsv \
+        --annotsv-tsv OMICS_09.cnv.annotsv.tsv \
         --classifycnv-dir /path/to/ClassifyCNV \
         --genome-build hg38 \
-        --output-tsv OMICS_09.wf_cnv.annotated.tsv
+        --output-tsv OMICS_09.cnv.annotated.tsv
 """
 import argparse
 import subprocess
@@ -105,7 +105,7 @@ def load_annotsv_cnvs(annotsv_tsv):
 
     # AnnotSV strips the "chr" prefix internally (SV_chrom is e.g. "4", not
     # "chr4"); put it back for consistency with the pipeline's own VCF
-    # contig naming (chr1, chr2, ... -- see the wf_cnv.vcf.gz header).
+    # contig naming (chr1, chr2, ... -- see the cnv.vcf.gz header).
     full['Chr'] = 'chr' + full['SV_chrom'].str.replace(r'^chr', '', regex=True)
     full['Start'] = full['SV_start']
     full['Stop'] = full['SV_end']
@@ -176,7 +176,7 @@ def main():
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         '--annotsv-tsv', required=True, type=Path,
-        help='AnnotSV output TSV (<sample>.wf_cnv.annotsv.tsv)')
+        help='AnnotSV output TSV (<sample>.cnv.annotsv.tsv)')
     parser.add_argument(
         '--classifycnv-dir', required=True, type=Path,
         help='Path to a cloned Genotek/ClassifyCNV checkout')
@@ -185,7 +185,7 @@ def main():
         help='Genome build of the input coordinates (default: hg38)')
     parser.add_argument(
         '--output-tsv', required=True, type=Path,
-        help='Output path (<sample>.wf_cnv.annotated.tsv)')
+        help='Output path (<sample>.cnv.annotated.tsv)')
     args = parser.parse_args()
 
     cnvs = load_annotsv_cnvs(args.annotsv_tsv)

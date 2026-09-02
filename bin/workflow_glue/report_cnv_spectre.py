@@ -85,7 +85,7 @@ def make_report(params, versions, cnv_df, args):
             p(
                 "This section displays a summary of the CNVs detected using an ",
                 a("ONT implementation of Spectre", href=spectre_url),
-                ", as part of the wf-human-variation workflow."
+                ", as part of the forest workflow."
             )
             Stats(
                 columns=4,

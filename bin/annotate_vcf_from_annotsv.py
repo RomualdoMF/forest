@@ -3,8 +3,8 @@
 
 Accepts two shapes of input TSV, auto-detected by its header:
 
-  - AnnotSV's own raw output (<sample>.wf_sv.annotsv.tsv /
-    <sample>.wf_cnv.annotsv.tsv, see modules/local/annotsv.nf run_annotsv) --
+  - AnnotSV's own raw output (<sample>.sv.annotsv.tsv /
+    <sample>.cnv.annotsv.tsv, see modules/local/annotsv.nf run_annotsv) --
     columns like SV_chrom/SV_start/SV_end/SV_type plus everything else
     AnnotSV computed. Only the "full" rows (one per variant; AnnotSV also
     emits "split" rows, one per overlapping gene) are used. Every column
@@ -20,7 +20,7 @@ Accepts two shapes of input TSV, auto-detected by its header:
     vs ~62% for DEL). ID-based matching doesn't care what either side calls
     the SV type.
 
-  - An already-merged ensemble TSV (<sample>.wf_cnv.annotated.tsv, produced
+  - An already-merged ensemble TSV (<sample>.cnv.annotated.tsv, produced
     by bin/cnv_ensemble_classify.py) -- already has Chr/Start/Stop/Type as
     its first four columns and every other column already prefixed
     (AnnotSV_ / ISV_ / ClassifyCNV_), so it's used as-is. This shape has no
@@ -36,7 +36,7 @@ ClassifyCNV skipped, or one AnnotSV didn't annotate) are passed through
 unannotated.
 
 This is what both the SV and CNV paths use to build their own
-.wf_sv.annotated.vcf.gz / .wf_cnv.annotated.vcf.gz -- instead of AnnotSV's
+.sv.annotated.vcf.gz / .cnv.annotated.vcf.gz -- instead of AnnotSV's
 native `-vcf 1` output (via its bundled variantconvert tool), which produced
 a header-only VCF with no records in every mode tried, and has since been
 removed from the pipeline's AnnotSV image entirely (see
@@ -51,9 +51,9 @@ scripts/) so Nextflow's automatic bin/-on-PATH convention picks it up.
 
 Usage:
     annotate_vcf_from_annotsv.py \
-        --annotated-tsv OMICS_09.wf_sv.annotsv.tsv \
-        --input-vcf OMICS_09.wf_sv.vcf.gz \
-        --output-vcf OMICS_09.wf_sv.annotated.vcf.gz
+        --annotated-tsv OMICS_09.sv.annotsv.tsv \
+        --input-vcf OMICS_09.sv.vcf.gz \
+        --output-vcf OMICS_09.sv.annotated.vcf.gz
 """
 import argparse
 import csv
@@ -145,7 +145,18 @@ def load_annotated_tsv(tsv_path):
 def _vcf_record_key(record, match_keys):
     if match_keys == RAW_MATCH_COLUMNS:
         return (record.chrom, record.id)
-    return (record.chrom, str(record.pos), record.info.get('SVTYPE'))
+    # CANONICAL_COLUMNS is ['Chr', 'Start', 'Stop', 'Type'] -- four columns --
+    # but this used to unconditionally return a 3-element (chrom, pos, SVTYPE)
+    # tuple here, missing Stop entirely. lookup below builds its keys generically
+    # from match_keys (a real 4-tuple for the ensemble/CANONICAL_COLUMNS shape),
+    # so a 3-element key could never equal a 4-element one -- every CNV ensemble
+    # record silently missed every single time (confirmed on a real run: 0 of 111
+    # CNV records got any AnnotSV_/ISV_/ClassifyCNV_ column at all, despite the
+    # merged TSV having real matching rows for most of them). record.stop is the
+    # same END pysam/htslib resolves for the raw SV path elsewhere in this
+    # pipeline (see modules/local/vep.nf and bin/workflow_glue/report_sv.py for
+    # the same property), matching the merged TSV's own 'Stop' column.
+    return (record.chrom, str(record.pos), str(record.stop), record.info.get('SVTYPE'))
 
 
 def annotate_vcf(rows, annotation_cols, match_keys, input_vcf, output_vcf):
@@ -155,6 +166,29 @@ def annotate_vcf(rows, annotation_cols, match_keys, input_vcf, output_vcf):
     }
 
     vcf_in = pysam.VariantFile(input_vcf)
+
+    # AnnotSV_REF/AnnotSV_ALT/AnnotSV_QUAL/AnnotSV_FILTER/AnnotSV_INFO/
+    # AnnotSV_FORMAT/AnnotSV_<sample> are AnnotSV's own copies of the source
+    # VCF's REF/ALT/QUAL/FILTER/INFO/FORMAT/genotype columns, verbatim --
+    # redundant with (and, for INFO/FORMAT, a garbled nested copy of, see the
+    # module docstring) the output VCF's own columns of the same name. The raw
+    # AnnotSV TSV path already dropped INFO/FORMAT before this point via
+    # RAW_ANNOTSV_CONSUMED_COLUMNS, but not REF/ALT/QUAL/FILTER/the sample
+    # column, and the merged ensemble TSV path (CANONICAL_COLUMNS) never
+    # dropped any of them -- confirmed on a real run: every CNV record carried
+    # AnnotSV_INFO=END:2605000,SVLEN:30000,...;AnnotSV_FORMAT=GT:HO:GQ:CN;
+    # AnnotSV_<sample>=0/0:0:60:2;AnnotSV_REF=G;AnnotSV_ALT=<DEL>;
+    # AnnotSV_QUAL=.;AnnotSV_FILTER=. Drop all of them here instead,
+    # uniformly, regardless of which TSV shape they came from -- the sample
+    # name varies per run, so it's read from the VCF's own header rather than
+    # hardcoded.
+    redundant_cols = {
+        'AnnotSV_REF', 'AnnotSV_ALT', 'AnnotSV_QUAL', 'AnnotSV_FILTER',
+        'AnnotSV_INFO', 'AnnotSV_FORMAT',
+    }
+    redundant_cols.update(f'AnnotSV_{sample}' for sample in vcf_in.header.samples)
+    annotation_cols = [c for c in annotation_cols if c not in redundant_cols]
+
     for col in annotation_cols:
         vcf_in.header.info.add(
             _sanitize_info_id(col), 1, 'String',
@@ -189,10 +223,10 @@ def main():
         help='AnnotSV raw TSV or a merged ensemble TSV (auto-detected)')
     parser.add_argument(
         '--input-vcf', required=True, type=Path,
-        help='Original VCF the TSV was derived from (.wf_sv.vcf.gz / .wf_cnv.vcf.gz)')
+        help='Original VCF the TSV was derived from (.sv.vcf.gz / .cnv.vcf.gz)')
     parser.add_argument(
         '--output-vcf', required=True, type=Path,
-        help='Output path (<sample>.wf_sv.annotated.vcf.gz / .wf_cnv.annotated.vcf.gz)')
+        help='Output path (<sample>.sv.annotated.vcf.gz / .cnv.annotated.vcf.gz)')
     args = parser.parse_args()
 
     rows, annotation_cols, match_keys = load_annotated_tsv(args.annotated_tsv)

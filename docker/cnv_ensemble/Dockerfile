@@ -1,12 +1,12 @@
 # ISV (https://github.com/tsladecek/isv_package) + ClassifyCNV
 # (https://github.com/Genotek/ClassifyCNV) combined into one container for
-# wf-omics's CNV classification ensemble (see bin/cnv_ensemble_classify.py).
+# forest's CNV classification ensemble (see bin/cnv_ensemble_classify.py).
 #
 # Combined into a single image rather than one-per-tool because: ClassifyCNV
 # has no Python package dependencies at all (stdlib + bedtools only -- checked
 # its source directly), nothing it needs conflicts with ISV's stack, and the
 # two are always run together as a single logical "CNV ensemble" step in the
-# script above -- see wf-omics.mdc, "Ensemble de classificação de CNV", for
+# script above -- see forest.mdc, "Ensemble de classificação de CNV", for
 # the fuller reasoning. (AnnotSV stays in its own separate image: it's used
 # independently and bind-mounts its own ~20GB annotation directory, which has
 # nothing to do with these two.)

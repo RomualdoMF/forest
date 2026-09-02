@@ -2,24 +2,23 @@ Output files may be aggregated including information for all samples or provided
 
 | Title | File path | Description | Per sample or aggregated |
 |-------|-----------|-------------|--------------------------|
-| Report of the alignment statistics | {{ alias }}.wf-human-alignment-report.html | Report summarising the results of the alignment statistics for the sample. | per-sample |
-| JSON file of some base statistics | {{ alias }}.stats.json | This JSON file contains base statistics on the reads, mappings, SNPs and SVs for the sample. | per-sample |
-| Report of the SNP workflow | {{ alias }}.wf-human-snp-report.html | Report summarising the results of the SNP subworkflow for the sample. | per-sample |
-| Report of the SV workflow | {{ alias }}.wf-human-sv-report.html | Report summarising the results of the SV subworkflow for the sample. | per-sample |
-| Report of the CNV workflow | {{ alias }}.wf-human-cnv-report.html | Report summarising the results of the CNV subworkflow for the sample. | per-sample |
-| Report of the STR workflow | {{ alias }}.wf-human-str-report.html | Report summarising the results of the short tandem repeat subworkflow for the sample. | per-sample |
-| Short variant VCF | {{ alias }}.wf_snp.vcf.gz | VCF file with the SNPs for the sample. | per-sample |
-| Structural variant VCF | {{ alias }}.wf_sv.vcf.gz | VCF file with the SVs for the sample. | per-sample |
-| Structural variant SNF | {{ alias }}.wf_sv.snf | SNF file with the SVs for the sample, for onward multi-sample SV calling. | per-sample |
-| Copy number variants VCF | {{ alias }}.wf_cnv.vcf.gz | VCF file with the CNV for the sample. | per-sample |
-| ClinVar variant VCF | {{ alias }}.wf_snp_clinvar.vcf.gz | VCF file with ClinVar annotations. | per-sample |
-| Modified bases bedMethyl | {{ alias }}.wf_mods.bedmethyl.gz | BED file with the aggregated modification counts for the sample. | per-sample |
-| Modified bases bedMethyl (haplotype 1) | {{ alias }}.wf_mods.1.bedmethyl.gz | BED file with the aggregated modification counts for haplotype 1 of the sample. | per-sample |
-| Modified bases bedMethyl (haplotype 2) | {{ alias }}.wf_mods.2.bedmethyl.gz | BED file with the aggregated modification counts for haplotype 2 of the sample. | per-sample |
-| 5mC bigWig | {{ alias }}.wf_mods.5mC.bw | bigWig for visualisation of aggregated 5mC modification counts. | per-sample |
-| 5mC bigWig (haplotype 1) | {{ alias }}.wf_mods.1-5mC.bw | bigWig for visualisation of aggregated 5mC modification counts for haplotype 1 of the sample. | per-sample |
-| 5mC bigWig (haplotype 2) | {{ alias }}.wf_mods.2-5mC.bw | bigWig for visualisation of aggregated 5mC modification counts for haplotype 2 of the sample. | per-sample |
-| Short tandem repeat VCF | {{ alias }}.wf_str.vcf.gz | VCF file with the STR sites for the sample. | per-sample |
+| Report of the alignment statistics | {{ alias }}.alignment-report.html | Report summarising the results of the alignment statistics for the sample. | per-sample |
+| JSON file of some base statistics | {{ alias }}.stats.json | This JSON file contains base statistics on the reads, mappings, SNVs and SVs for the sample. | per-sample |
+| Report of the SNV workflow | {{ alias }}.snv-report.html | Report summarising the results of the SNV subworkflow for the sample. | per-sample |
+| Report of the SV workflow | {{ alias }}.sv-report.html | Report summarising the results of the SV subworkflow for the sample. | per-sample |
+| Report of the CNV workflow | {{ alias }}.cnv-report.html | Report summarising the results of the CNV subworkflow for the sample. | per-sample |
+| Report of the STR workflow | {{ alias }}.str-report.html | Report summarising the results of the short tandem repeat subworkflow for the sample. | per-sample |
+| Short variant VCF | {{ alias }}.snv.vcf.gz | VCF file with the SNVs for the sample. | per-sample |
+| Structural variant VCF | {{ alias }}.sv.vcf.gz | VCF file with the SVs for the sample. | per-sample |
+| Structural variant SNF | {{ alias }}.sv.snf | SNF file with the SVs for the sample, for onward multi-sample SV calling. | per-sample |
+| Copy number variants VCF | {{ alias }}.cnv.vcf.gz | VCF file with the CNV for the sample. | per-sample |
+| Modified bases bedMethyl | {{ alias }}.mods.bedmethyl.gz | BED file with the aggregated modification counts for the sample. | per-sample |
+| Modified bases bedMethyl (haplotype 1) | {{ alias }}.mods.1.bedmethyl.gz | BED file with the aggregated modification counts for haplotype 1 of the sample. | per-sample |
+| Modified bases bedMethyl (haplotype 2) | {{ alias }}.mods.2.bedmethyl.gz | BED file with the aggregated modification counts for haplotype 2 of the sample. | per-sample |
+| 5mC bigWig | {{ alias }}.mods.5mC.bw | bigWig for visualisation of aggregated 5mC modification counts. | per-sample |
+| 5mC bigWig (haplotype 1) | {{ alias }}.mods.1-5mC.bw | bigWig for visualisation of aggregated 5mC modification counts for haplotype 1 of the sample. | per-sample |
+| 5mC bigWig (haplotype 2) | {{ alias }}.mods.2-5mC.bw | bigWig for visualisation of aggregated 5mC modification counts for haplotype 2 of the sample. | per-sample |
+| Short tandem repeat VCF | {{ alias }}.str.vcf.gz | VCF file with the STR sites for the sample. | per-sample |
 | Alignment file | {{ alias }}.cram | CRAM or BAM file with the aligned reads for the sample, generated when the input file is unaligned. | per-sample |
 | Alignment file index | {{ alias }}.cram.crai | The index of the resulting CRAM or BAM file with the reads for the sample, generated when the input file is unaligned. | per-sample |
 | Haplotagged alignment file | {{ alias }}.haplotagged.cram | CRAM or BAM file of all input reads with haplotags added by phasing. | per-sample |

@@ -12,10 +12,10 @@ process sniffles2 {
         val genome_build
     output:
         tuple val(xam_meta), path("*.sniffles.vcf"), emit: vcf
-        path "${xam_meta.alias}.wf_sv.snf", emit: snf
+        path "${xam_meta.alias}.sv.snf", emit: snf
     publishDir \
         path: "${params.out_dir}",
-        pattern: "${xam_meta.alias}.wf_sv.snf",
+        pattern: "${xam_meta.alias}.sv.snf",
         mode: 'copy'
     script:
         // if tr_arg is not provided and genome_build is set
@@ -30,7 +30,7 @@ process sniffles2 {
         }
         def sniffles_args = params.sniffles_args ?: ''
         def min_sv_len = params.min_sv_length ? "--minsvlen ${params.min_sv_length}" : ""
-        // Perform internal phasing only if snp not requested; otherwise, use joint phasing.
+        // Perform internal phasing only if snv not requested; otherwise, use joint phasing.
         def phase = params.phased ? "--phase" : ""
     """
     sniffles \
@@ -42,7 +42,7 @@ process sniffles2 {
         --input $xam \
         --reference $ref \
         --input-exclude-flags 2308 \
-        --snf ${xam_meta.alias}.wf_sv.snf \
+        --snf ${xam_meta.alias}.sv.snf \
         $tr_arg \
         $sniffles_args \
         $phase \
@@ -95,12 +95,12 @@ process sortVCF {
     input:
         tuple val(xam_meta), path(vcf)
     output:
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_sv.vcf.gz"), emit: vcf_gz
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_sv.vcf.gz.tbi"), emit: vcf_tbi
+        tuple val(xam_meta), path("${xam_meta.alias}.sv.vcf.gz"), emit: vcf_gz
+        tuple val(xam_meta), path("${xam_meta.alias}.sv.vcf.gz.tbi"), emit: vcf_tbi
     script:
     """
-    bcftools sort -m 2G -T ./ -O z $vcf > ${xam_meta.alias}.wf_sv.vcf.gz
-    tabix -p vcf ${xam_meta.alias}.wf_sv.vcf.gz
+    bcftools sort -m 2G -T ./ -O z $vcf > ${xam_meta.alias}.sv.vcf.gz
+    tabix -p vcf ${xam_meta.alias}.sv.vcf.gz
     """
 }
 
@@ -137,7 +137,7 @@ process report {
         path "${xam_meta.alias}.svs.json", emit: json
     script:
         String workflow_name = workflow.manifest.name.replace("epi2me-labs/", "")
-        def report_name = "${xam_meta.alias}.wf-human-sv-report.html"
+        def report_name = "${xam_meta.alias}.sv-report.html"
         def evalResults = eval_json.name != 'OPTIONAL_FILE' ? "--eval_results ${eval_json}" : ""
         def generate_html = params.output_report ? "" : "--skip_report"
     """

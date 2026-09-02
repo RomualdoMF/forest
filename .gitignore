@@ -10,3 +10,4 @@ work/
 output/
 __pycache__/
 *.log
+*.mdc

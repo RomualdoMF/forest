@@ -23,9 +23,9 @@ this only ever keeps the two target columns per row to stay memory-reasonable.
 
 Usage:
     annotate_vcf_with_tapes.py \
-        --tapes-tsv OMICS_09.wf_snp.tapes.txt \
-        --input-vcf OMICS_09.wf_snp.vcf.gz \
-        --output-vcf OMICS_09.wf_snp.annotated.vcf.gz
+        --tapes-tsv OMICS_09.snv.tapes.txt \
+        --input-vcf OMICS_09.snv.vcf.gz \
+        --output-vcf OMICS_09.snv.annotated.vcf.gz
 """
 import argparse
 import csv

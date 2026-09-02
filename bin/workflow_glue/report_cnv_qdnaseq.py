@@ -379,7 +379,7 @@ def make_report(
         p(
             "This report contains CNVs detected using ",
             a("QDNAseq", href=qdnaseq_url),
-            ", as part of the wf-human-variation workflow."
+            ", as part of the forest workflow."
         )
 
     with report.main_content:

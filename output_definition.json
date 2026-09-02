@@ -1,7 +1,7 @@
 {
   "files": {
     "workflow-alignment-stats-report": {
-      "filepath": "{{ alias }}.wf-human-alignment-report.html",
+      "filepath": "{{ alias }}.alignment-report.html",
       "title": "Report of the alignment statistics",
       "description": "Report summarising the results of the alignment statistics for the sample.",
       "mime-type": "text/html",
@@ -11,21 +11,21 @@
     "metrics-json": {
       "filepath": "{{ alias }}.stats.json",
       "title": "JSON file of some base statistics",
-      "description": "This JSON file contains base statistics on the reads, mappings, SNPs and SVs for the sample.",
+      "description": "This JSON file contains base statistics on the reads, mappings, SNVs and SVs for the sample.",
       "mime-type": "application/json",
       "optional": false,
       "type": "per-sample"
     },
     "workflow-snv-report": {
-      "filepath": "{{ alias }}.wf-human-snp-report.html",
-      "title": "Report of the SNP workflow",
-      "description": "Report summarising the results of the SNP subworkflow for the sample.",
+      "filepath": "{{ alias }}.snv-report.html",
+      "title": "Report of the SNV workflow",
+      "description": "Report summarising the results of the SNV subworkflow for the sample.",
       "mime-type": "text/html",
       "optional": true,
       "type": "per-sample"
     },
     "workflow-sv-report": {
-      "filepath": "{{ alias }}.wf-human-sv-report.html",
+      "filepath": "{{ alias }}.sv-report.html",
       "title": "Report of the SV workflow",
       "description": "Report summarising the results of the SV subworkflow for the sample.",
       "mime-type": "text/html",
@@ -33,7 +33,7 @@
       "type": "per-sample"
     },
     "workflow-cnv-report": {
-      "filepath": "{{ alias }}.wf-human-cnv-report.html",
+      "filepath": "{{ alias }}.cnv-report.html",
       "title": "Report of the CNV workflow",
       "description": "Report summarising the results of the CNV subworkflow for the sample.",
       "mime-type": "text/html",
@@ -41,23 +41,23 @@
       "type": "per-sample"
     },
     "workflow-str-report": {
-      "filepath": "{{ alias }}.wf-human-str-report.html",
+      "filepath": "{{ alias }}.str-report.html",
       "title": "Report of the STR workflow",
       "description": "Report summarising the results of the short tandem repeat subworkflow for the sample.",
       "mime-type": "text/html",
       "optional": true,
       "type": "per-sample"
     },
-    "snp-vcf": {
-      "filepath": "{{ alias }}.wf_snp.vcf.gz",
+    "snv-vcf": {
+      "filepath": "{{ alias }}.snv.vcf.gz",
       "title": "Short variant VCF",
-      "description": "VCF file with the SNPs for the sample.",
+      "description": "VCF file with the SNVs for the sample.",
       "mime-type": "application/gzip",
       "optional": true,
       "type": "per-sample"
     },
     "sv-vcf": {
-      "filepath": "{{ alias }}.wf_sv.vcf.gz",
+      "filepath": "{{ alias }}.sv.vcf.gz",
       "title": "Structural variant VCF",
       "description": "VCF file with the SVs for the sample.",
       "mime-type": "application/gzip",
@@ -65,7 +65,7 @@
       "type": "per-sample"
     },
     "sv-snf": {
-      "filepath": "{{ alias }}.wf_sv.snf",
+      "filepath": "{{ alias }}.sv.snf",
       "title": "Structural variant SNF",
       "description": "SNF file with the SVs for the sample, for onward multi-sample SV calling.",
       "mime-type": "application/gzip",
@@ -73,23 +73,15 @@
       "type": "per-sample"
     },
     "cnv-vcf": {
-      "filepath": "{{ alias }}.wf_cnv.vcf.gz",
+      "filepath": "{{ alias }}.cnv.vcf.gz",
       "title": "Copy number variants VCF",
       "description": "VCF file with the CNV for the sample.",
       "mime-type": "application/gzip",
       "optional": true,
       "type": "per-sample"
     },
-    "clinvar-vcf": {
-      "filepath": "{{ alias }}.wf_snp_clinvar.vcf.gz",
-      "title": "ClinVar variant VCF",
-      "description": "VCF file with ClinVar annotations.",
-      "mime-type": "application/gzip",
-      "optional": true,
-      "type": "per-sample"
-    },
     "mod-bedmethyl": {
-      "filepath": "{{ alias }}.wf_mods.bedmethyl.gz",
+      "filepath": "{{ alias }}.mods.bedmethyl.gz",
       "title": "Modified bases bedMethyl",
       "description": "BED file with the aggregated modification counts for the sample.",
       "mime-type": "application/gzip",
@@ -97,7 +89,7 @@
       "type": "per-sample"
     },
     "mod-bedmethyl-hap1": {
-      "filepath": "{{ alias }}.wf_mods.1.bedmethyl.gz",
+      "filepath": "{{ alias }}.mods.1.bedmethyl.gz",
       "title": "Modified bases bedMethyl (haplotype 1)",
       "description": "BED file with the aggregated modification counts for haplotype 1 of the sample.",
       "mime-type": "application/gzip",
@@ -105,7 +97,7 @@
       "type": "per-sample"
     },
     "mod-bedmethyl-hap2": {
-      "filepath": "{{ alias }}.wf_mods.2.bedmethyl.gz",
+      "filepath": "{{ alias }}.mods.2.bedmethyl.gz",
       "title": "Modified bases bedMethyl (haplotype 2)",
       "description": "BED file with the aggregated modification counts for haplotype 2 of the sample.",
       "mime-type": "application/gzip",
@@ -113,7 +105,7 @@
       "type": "per-sample"
     },
     "mod-bedmethyl-5mc-bigwig": {
-      "filepath": "{{ alias }}.wf_mods.5mC.bw",
+      "filepath": "{{ alias }}.mods.5mC.bw",
       "title": "5mC bigWig",
       "description": "bigWig for visualisation of aggregated 5mC modification counts.",
       "mime-type": "application/gzip",
@@ -121,7 +113,7 @@
       "type": "per-sample"
     },
     "mod-bedmethyl-hap1-5mc-bigwig": {
-      "filepath": "{{ alias }}.wf_mods.1-5mC.bw",
+      "filepath": "{{ alias }}.mods.1-5mC.bw",
       "title": "5mC bigWig (haplotype 1)",
       "description": "bigWig for visualisation of aggregated 5mC modification counts for haplotype 1 of the sample.",
       "mime-type": "application/gzip",
@@ -129,7 +121,7 @@
       "type": "per-sample"
     },
     "mod-bedmethyl-hap2-5mc-bigwig": {
-      "filepath": "{{ alias }}.wf_mods.2-5mC.bw",
+      "filepath": "{{ alias }}.mods.2-5mC.bw",
       "title": "5mC bigWig (haplotype 2)",
       "description": "bigWig for visualisation of aggregated 5mC modification counts for haplotype 2 of the sample.",
       "mime-type": "application/gzip",
@@ -137,7 +129,7 @@
       "type": "per-sample"
     },
     "str-vcf": {
-      "filepath": "{{ alias }}.wf_str.vcf.gz",
+      "filepath": "{{ alias }}.str.vcf.gz",
       "title": "Short tandem repeat VCF",
       "description": "VCF file with the STR sites for the sample.",
       "mime-type": "application/gzip",

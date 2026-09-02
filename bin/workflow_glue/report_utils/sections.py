@@ -227,7 +227,7 @@ def at_a_glance(report, sample_names, values, use_bed=False):
         # at-a-glace stats + intro
         description_text = """
             This report contains visualisations of statistics that can help in
-            understanding the results from the wf-human-variation workflow. Each section
+            understanding the results from the forest workflow. Each section
             contains different plots or tables, and in general the results are broken
             down by sample. You can quickly jump to an individual section with the links
             in the header bar.

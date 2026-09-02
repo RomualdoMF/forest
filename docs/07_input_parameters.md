@@ -3,9 +3,9 @@
 | Nextflow parameter name  | Type | Description | Help | Default |
 |--------------------------|------|-------------|------|---------|
 | sv | boolean | Call for structural variants. | If this option is selected, structural variant calling will be carried out using Sniffles2. | False |
-| snp | boolean | Call for small variants | If this option is selected, small variant calling will be carried out using Clair3. | False |
+| snv | boolean | Call for small variants | If this option is selected, small variant calling will be carried out using Clair3. | False |
 | cnv | boolean | Call for copy number variants. | If this option is selected, copy number variant calling will be carried out with either Spectre (default) or QDNAseq. To use QDNAseq instead of Spectre, use the option --use_qdnaseq. | False |
-| str | boolean | Enable Straglr to genotype STR expansions. | If this option is selected, genotyping of STR expansions will be carried out using Straglr. This option will also automatically enable the SNP subworkflow as the STR caller requires a haplotagged BAM. This sub-workflow is only compatible with genome build hg38. | False |
+| str | boolean | Enable Straglr to genotype STR expansions. | If this option is selected, genotyping of STR expansions will be carried out using Straglr. This option will also automatically enable the SNV subworkflow as the STR caller requires a haplotagged BAM. This sub-workflow is only compatible with genome build hg38. | False |
 | mod | boolean | Enable output of modified calls to a bedMethyl file [requires input BAM with Ml and Mm tags] | This option is automatically selected and aggregation of modified calls with be carried out using modkit if Ml and Mm tags are found. Disable this option to prevent output of a bedMethyl file. | False |
 
 
@@ -20,7 +20,7 @@
 | bed | string | An optional BED file enumerating regions to process for variant calling. If a fourth column is present, this will be used to generate coverage metrics for the provided regions. |  |  |
 | coverage_bed | string | An optional BED file enumerating regions to process for coverage metrics only. Requires a fourth BED column specifying region name in order to be valid. |  |  |
 | annotation | boolean | SnpEff annotation. | If this option is unselected, VCFs will not be annotated with SnpEff. | True |
-| phased | boolean | Perform phasing. | This option enables phasing of SV, SNP and modifications, depending on which sub-workflow has been chosen; see [README](README.md#9-phasing-variants) for more details. | False |
+| phased | boolean | Perform phasing. | This option enables phasing of SV, SNV and modifications, depending on which sub-workflow has been chosen; see [README](README.md#9-phasing-variants) for more details. | False |
 | include_all_ctgs | boolean | Call for variants on all sequences in the reference, otherwise small and structural variants will only be called on chr{1..22,X,Y,MT}. | Enabling this option will call for variants on all contigs of the input reference sequence. Typically this option is not required as standard human reference sequences contain decoy and unplaced contigs that are usually omitted for the purpose of variant calling. This option might be useful for non-standard reference sequence databases. | False |
 | igv | boolean | Visualize outputs in the EPI2ME IGV visualizer. | Enabling this option will visualize the alignments and VCF files in the EPI2ME desktop app IGV visualizer. | False |
 | out_dir | string | Directory for output of all workflow results. |  | output |

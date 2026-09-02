@@ -15,7 +15,7 @@ process callCNV {
         val(genome_build)
     output:
         tuple val(xam_meta), path("${xam_meta.alias}_combined.bed"), path("${xam_meta.alias}*"), path("${xam_meta.alias}_noise_plot.png"), path("${xam_meta.alias}_isobar_plot.png"), emit: cnv_output
-        tuple val(xam_meta), path("${xam_meta.alias}.wf_cnv.vcf.gz"), path("${xam_meta.alias}.wf_cnv.vcf.gz.tbi"), emit: cnv_vcf
+        tuple val(xam_meta), path("${xam_meta.alias}.cnv.vcf.gz"), path("${xam_meta.alias}.cnv.vcf.gz.tbi"), emit: cnv_vcf
     script:
         """
         run_qdnaseq.r --bam ${bam} --out_prefix ${xam_meta.alias} --binsize ${params.qdnaseq_bin_size} --reference ${genome_build}
@@ -24,12 +24,12 @@ process callCNV {
         # Fix known QDNAseq VCF malformations
         mv ${xam_meta.alias}_calls.vcf raw.vcf
         mv ${xam_meta.alias}_segs.vcf raw_segs.vcf
-        fix_qdnaseq_vcf.py -i raw.vcf -o ${xam_meta.alias}.wf_cnv.vcf --sample_id ${xam_meta.alias}
+        fix_qdnaseq_vcf.py -i raw.vcf -o ${xam_meta.alias}.cnv.vcf --sample_id ${xam_meta.alias}
         fix_qdnaseq_vcf.py -i raw_segs.vcf -o ${xam_meta.alias}_segs.vcf --sample_id ${xam_meta.alias}
 
         # bgzip and index calls VCF
-        bgzip ${xam_meta.alias}.wf_cnv.vcf
-        tabix -f -p vcf ${xam_meta.alias}.wf_cnv.vcf.gz
+        bgzip ${xam_meta.alias}.cnv.vcf
+        tabix -f -p vcf ${xam_meta.alias}.cnv.vcf.gz
         """
 }
 
@@ -59,11 +59,11 @@ process makeReport {
         path "params.json"
         val(genome_build)
     output:
-        path("*wf-human-cnv-report.html")
+        path("*cnv-report.html")
 
     script:
         String workflow_name = workflow.manifest.name.replace("epi2me-labs/", "")
-        def report_name = "${xam_meta.alias}.wf-human-cnv-report.html"
+        def report_name = "${xam_meta.alias}.cnv-report.html"
         """
         workflow-glue report_cnv_qdnaseq \
             -q ${cnv_calls} \

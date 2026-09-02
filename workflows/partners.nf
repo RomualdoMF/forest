@@ -10,12 +10,12 @@ process publish_geneyx {
         tuple val(meta), path('str.vcf.gz'), path('str.vcf.gz.tbi')
 
     output:
-        tuple path("${meta.alias}.wf_snp.geneyx.vcf.gz"), path("${meta.alias}.wf_snp.geneyx.vcf.gz.tbi"), optional: true
-        tuple path("${meta.alias}.wf_sv.geneyx.vcf.gz"), path("${meta.alias}.wf_sv.geneyx.vcf.gz.tbi"), optional: true
+        tuple path("${meta.alias}.snv.geneyx.vcf.gz"), path("${meta.alias}.snv.geneyx.vcf.gz.tbi"), optional: true
+        tuple path("${meta.alias}.sv.geneyx.vcf.gz"), path("${meta.alias}.sv.geneyx.vcf.gz.tbi"), optional: true
 
     script:
     // Define switches to prepare output data
-    prep_snp = params.snp ?: false
+    prep_snv = params.snv ?: false
     prep_sv = params.sv || params.cnv || params.str ?: false
     // Inputs for creation of unified VCF of SV/STR/CNV
     def sv = params.sv ? "-s sv.vcf.gz" : ""
@@ -23,14 +23,14 @@ process publish_geneyx {
     def str = params.str ? "-r str.vcf.gz" : ""
     """
     if ${prep_sv}; then
-        workflow-glue unify_vcf ${sv} ${cnv} ${str} -o ${meta.alias}.wf_sv.geneyx.vcf && \
-            bcftools sort -O z -o ${meta.alias}.wf_sv.geneyx.vcf.gz ${meta.alias}.wf_sv.geneyx.vcf && \
-            bcftools index -t ${meta.alias}.wf_sv.geneyx.vcf.gz && rm ${meta.alias}.wf_sv.geneyx.vcf
+        workflow-glue unify_vcf ${sv} ${cnv} ${str} -o ${meta.alias}.sv.geneyx.vcf && \
+            bcftools sort -O z -o ${meta.alias}.sv.geneyx.vcf.gz ${meta.alias}.sv.geneyx.vcf && \
+            bcftools index -t ${meta.alias}.sv.geneyx.vcf.gz && rm ${meta.alias}.sv.geneyx.vcf
     fi
 
-    # Prepare SNPs if available
-    if ${prep_snp}; then
-        cp snv.vcf.gz ${meta.alias}.wf_snp.geneyx.vcf.gz && bcftools index -t ${meta.alias}.wf_snp.geneyx.vcf.gz
+    # Prepare SNVs if available
+    if ${prep_snv}; then
+        cp snv.vcf.gz ${meta.alias}.snv.geneyx.vcf.gz && bcftools index -t ${meta.alias}.snv.geneyx.vcf.gz
     fi
     """
 }
@@ -72,7 +72,7 @@ workflow partners {
 
         if (params.partner == "geneyx"){
             combined_vcf_ch = publish_geneyx(
-                params.snp || run_haplotagging ? snv : placeholder_ch,
+                params.snv || run_haplotagging ? snv : placeholder_ch,
                 params.sv ? sv : placeholder_ch,
                 params.cnv ? cnv : placeholder_ch,
                 params.str ? str : placeholder_ch
