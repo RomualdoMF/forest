@@ -1,7 +1,4 @@
-<p>
-  <img width="150" alt="Forest" src="docs/images/forest.logo.svg" style="vertical-align: middle;">
-  <span style="font-size: 2em; font-weight: bold;">Forest</span>
-</p>
+![Forest logo](docs/images/forest.logo.2.svg)
 
 ALFA Release
 
