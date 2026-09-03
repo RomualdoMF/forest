@@ -50,6 +50,15 @@ class WorkflowMain {
             System.exit(0)
         }
 
+        // --report skips the whole pipeline: launch interactive_report/report.py
+        // directly against the given report.config instead (see
+        // lib/ReportLauncher.groovy). Checked before schema validation/the conda
+        // check below, same as --help/--version above, since --report needs none of
+        // the usual --bam/--ref/--sample_name pipeline inputs.
+        if (params.report) {
+            ReportLauncher.launch(params.report, workflow.projectDir.toString())
+        }
+
         // Explode on conda
         // conda.enabled seems to be backward compatible but wrap this
         // in a generic catch just in case

@@ -98,12 +98,12 @@
                         }
                     }
                 },
-                "tldr": {
-                    "title": "tldr: Transposable element insertions",
+                "steller": {
+                    "title": "sTELLeR: Transposable element insertions",
                     "type": "boolean",
                     "default": false,
-                    "description": "Identify and annotate transposable-element-mediated insertions.",
-                    "help_text": "If this option is selected, tldr (https://github.com/adamewing/tldr) will run per-contig against the same haplotagged BAMs the STR subworkflow consumes, merging results into a single whole-sample table. Requires haplotagging, same as --str: turning --tldr on by itself is enough to trigger it, no need to also pass --phased."
+                    "description": "Identify non-reference transposable element (Alu/L1/SVA/HERV) insertions.",
+                    "help_text": "If this option is selected, sTELLeR (https://github.com/KristineBilgrav/sTELLeR) will run per-contig against the same haplotagged BAMs the STR subworkflow consumes, publishing one VCF per contig (unmerged). Requires haplotagging, same as --str: turning --steller on by itself is enough to trigger it, no need to also pass --phased."
                 }
             },
             "anyOf": [
@@ -746,7 +746,7 @@
                     "type": "integer",
                     "default": 128,
                     "description": "Ceiling, in GB, for every task.attempt-scaled memory retry in the pipeline.",
-                    "help_text": "See lib/MemoryScaling.groovy, used by mosdepth, dmr_calling, pileup_variants, evaluate_candidates, aggregate_*_variants, post_clair_phase_contig, post_clair_contig_haplotag, aggregate_all_variants, refine_with_sv, phase_contig, run_tapes, merge_tapes, call_tldr, callCNV and run_fastvep. No process will ever request more than this on a retry, however many attempts its own maxRetries allows -- each process' maxRetries is itself derived from this value, so raising/lowering it also changes how many times that process will retry. Lower it for a smaller host, e.g. --max_memory 64."
+                    "help_text": "See lib/MemoryScaling.groovy, used by mosdepth, dmr_calling, pileup_variants, evaluate_candidates, aggregate_*_variants, post_clair_phase_contig, post_clair_contig_haplotag, aggregate_all_variants, refine_with_sv, phase_contig, run_tapes, merge_tapes, call_steller, callCNV and run_fastvep. No process will ever request more than this on a retry, however many attempts its own maxRetries allows -- each process' maxRetries is itself derived from this value, so raising/lowering it also changes how many times that process will retry. Lower it for a smaller host, e.g. --max_memory 64."
                 }
             }
         },
@@ -826,6 +826,14 @@
                     "default": false,
                     "description": "Display version and exit.",
                     "fa_icon": "fas fa-question-circle",
+                    "hidden": true
+                },
+                "report": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to a report.config file -- launches interactive_report/report.py against it directly and skips the rest of the pipeline.",
+                    "help_text": "None of the usual pipeline inputs (--bam/--ref/--sample_name/...) are needed in this mode. See ReportConfig.generate (lib/ReportConfig.groovy), which writes a ready-to-use report.config into out_dir at the end of every successful run.",
+                    "fa_icon": "fas fa-chart-bar",
                     "hidden": true
                 },
                 "store_dir": {
@@ -992,108 +1000,32 @@
                 }
             }
         },
-        "tldr_options": {
-            "title": "tldr transposable element options",
+        "steller_options": {
+            "title": "sTELLeR transposable element options",
             "type": "object",
-            "description": "One parameter per tldr (https://github.com/adamewing/tldr) CLI option, except -b/--bams, -r/--ref, -o/--outbase, -c/--chroms, which the pipeline wires internally. Only relevant when --tldr is on.",
+            "description": "Parameters for sTELLeR (https://github.com/KristineBilgrav/sTELLeR) CLI options, except -R/--ref, -b/--bam, -o/--output (wired internally by the pipeline) and --style (always \"ont\", hardcoded). Only relevant when --steller is on.",
             "properties": {
-                "tldr_elts": {
+                "steller_sr": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Minimum number of supporting split reads/insertions to call a variant (sTELLeR's -r/--sr)."
+                },
+                "steller_mq": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Mapping quality threshold (sTELLeR's -m/--mq)."
+                },
+                "steller_maxreads": {
+                    "type": "integer",
+                    "default": 80,
+                    "description": "Maximum number of supporting split reads/insertions to call a variant (sTELLeR's -mr/--maxreads)."
+                },
+                "steller_TE_fasta": {
                     "type": "string",
-                    "default": "/opt/tldr/ref/teref.ont.human.fa",
-                    "description": "Transposable element reference sequences (tldr's -e/--elts).",
-                    "help_text": "Defaults to the human reference data bundled inside the tldr image itself ($TLDR_REF_DIR=/opt/tldr/ref) -- no external download needed. Overriding requires the file to already be reachable inside the tldr container; there is no bind-mounted data directory for tldr."
-                },
-                "tldr_nonref": {
-                    "type": "string",
-                    "default": "/opt/tldr/ref/nonref.collection.hg38.chr.bed.gz",
-                    "description": "Known non-reference (polymorphic) insertion sites, for annotation (tldr's -n/--nonref).",
-                    "help_text": "Bundled default is hg38 with \"chr\"-prefixed contigs. Override to \"/opt/tldr/ref/nonref.collection.hg19.chr.bed.gz\" for a hg19 reference, or set to null/false to disable -n entirely."
-                },
-                "tldr_procs": {
-                    "type": "integer",
-                    "default": 4,
-                    "description": "Per-contig tldr process count (tldr's -p/--procs); also used as the process's cpus."
-                },
-                "tldr_minreads": {
-                    "type": "integer",
-                    "default": 3,
-                    "description": "Minimum supporting reads to report an insertion (tldr's -m/--minreads)."
-                },
-                "tldr_embed_minreads": {
-                    "type": "integer",
-                    "default": 1,
-                    "description": "Minimum reads to embed in the output table (tldr's --embed_minreads)."
-                },
-                "tldr_max_te_len": {
-                    "type": "integer",
-                    "default": 10000,
-                    "description": "Maximum transposable element length considered (tldr's --max_te_len)."
-                },
-                "tldr_min_te_len": {
-                    "type": "integer",
-                    "default": 200,
-                    "description": "Minimum transposable element length considered (tldr's --min_te_len)."
-                },
-                "tldr_min_alt_frac": {
-                    "type": "number",
-                    "default": 0.5,
-                    "description": "Minimum alt allele fraction to report an insertion (tldr's --min_alt_frac)."
-                },
-                "tldr_min_alt_depth": {
-                    "type": "integer",
-                    "default": 3,
-                    "description": "Minimum alt allele read depth to report an insertion (tldr's --min_alt_depth)."
-                },
-                "tldr_min_total_depth_frac": {
-                    "type": "number",
-                    "default": 0.25,
-                    "description": "Minimum fraction of total local depth required (tldr's --min_total_depth_frac)."
-                },
-                "tldr_max_cluster_size": {
-                    "type": "integer",
-                    "description": "Maximum read cluster size (tldr's --max_cluster_size). Unset (null) means no limit, tldr's own default."
-                },
-                "tldr_wiggle": {
-                    "type": "integer",
-                    "default": 50,
-                    "description": "Positional wiggle room, in bp, when clustering candidate insertions (tldr's --wiggle)."
-                },
-                "tldr_flanksize": {
-                    "type": "integer",
-                    "default": 500,
-                    "description": "Flanking sequence length, in bp, used for consensus building (tldr's --flanksize)."
-                },
-                "tldr_color_consensus": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Embed ANSI colour escape codes in the consensus sequence column (tldr's --color_consensus).",
-                    "help_text": "Fine to view with e.g. `less -R`, but will corrupt naive parsing of that column."
-                },
-                "tldr_detail_output": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Write tldr's detailed per-read output files (tldr's --detail_output)."
-                },
-                "tldr_extend_consensus": {
-                    "type": "integer",
-                    "default": 0,
-                    "description": "Extend consensus sequences by this many bp on each side (tldr's --extend_consensus)."
-                },
-                "tldr_trdcol": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Add a transduction column to the output table (tldr's --trdcol)."
-                },
-                "tldr_keep_pickles": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Keep the intermediate cluster .pickle files (tldr's --keep_pickles)."
-                },
-                "tldr_use_pickles": {
-                    "type": "string",
-                    "description": "Directory of .pickle files from a previous tldr_keep_pickles run to reuse (tldr's --use_pickles).",
-                    "help_text": "Unset (null) builds clusters from scratch.",
-                    "format": "directory-path"
+                    "format": "file-path",
+                    "default": "/home/usuario/tools/steller/TEsequences_SVA_HERV_ALU_L1.fasta",
+                    "description": "Fasta file of transposable element sequences to detect (sTELLeR's -tf/--TE_fasta).",
+                    "help_text": "Unlike tldr, sTELLeR ships no bundled TE reference inside its image -- this must be a real host path, staged into each task like any other input file."
                 }
             }
         }
@@ -1136,7 +1068,7 @@
             "$ref": "#/definitions/str_options"
         },
         {
-            "$ref": "#/definitions/tldr_options"
+            "$ref": "#/definitions/steller_options"
         },
         {
             "$ref": "#/definitions/sv_benchmark_options"

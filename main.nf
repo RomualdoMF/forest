@@ -11,8 +11,8 @@ include { output_sv } from './modules/local/wf-human-sv'
 include { str } from './workflows/wf-human-str'
 include { output_str } from './modules/local/wf-human-str'
 
-include { tldr } from './modules/local/tldr'
-include { output_tldr } from './modules/local/tldr'
+include { steller } from './modules/local/steller'
+include { output_steller } from './modules/local/steller'
 
 include { cnv as cnv_spectre } from './workflows/wf-human-cnv'
 
@@ -175,7 +175,7 @@ workflow {
     }
 
     // Trigger haplotagging
-    def run_haplotagging = params.str || params.phased || params.tldr
+    def run_haplotagging = params.str || params.phased || params.steller
 
     // DMR calling validation (see workflows/dmr.nf)
     if (params.dmr_haplotype_compare && !params.mod) {
@@ -1088,14 +1088,14 @@ workflow {
         str_vcf = Channel.empty()
     }
 
-    // tldr (transposable element insertion detection) -- runs on the same
-    // per-contig, pre-merge haplotagged BAMs as str() above.
-    if (params.tldr) {
-        results_tldr = tldr(
+    // sTELLeR (transposable element insertion detection) -- runs on the same
+    // per-contig, pre-merge haplotagged BAMs as str() above (replaces tldr).
+    if (params.steller) {
+        results_steller = steller(
           clair_vcf.str_bams,
           ref_channel
         )
-        output_tldr(results_tldr.output)
+        output_steller(results_steller.output)
     }
 
     // Combine into a final JSON of analyses stats
@@ -1211,6 +1211,13 @@ workflow {
 }
 
 workflow.onComplete {
+    if (workflow.success) {
+        try {
+            ReportConfig.generate(params, workflow.projectDir)
+        } catch (Exception e) {
+            log.warn "Failed to generate report.config: ${e.message}"
+        }
+    }
     Pinguscript.ping_complete(nextflow, workflow, params)
 }
 workflow.onError {
