@@ -29,15 +29,41 @@ class ReportLauncher {
         String port = values.getOrDefault('port', '8000')
 
         // report.config's own paths (written by ReportConfig.generate, or hand-edited
-        // in interactive_report/report.config) are always absolute paths under
-        // /home/usuario -- out_dir and interactive_report/ both live there, same as
-        // every other data path on this host (fastvep_sa_dir, annotsv_annotations_dir,
-        // etc. all follow the same convention). Bind-mounting the whole home directory
-        // (rather than trying to enumerate every path report.config might reference)
-        // mirrors the original manual `docker run -v /home/usuario:/home/usuario`
-        // invocation this pipeline's own steller integration was modelled on.
+        // in interactive_report/report.config) are always absolute paths under the
+        // invoking user's home directory -- out_dir and interactive_report/ both live
+        // there, same convention as every other data path in this pipeline
+        // (fastvep_sa_dir, annotsv_annotations_dir, etc.). Bind-mounting the whole
+        // home directory (rather than trying to enumerate every path report.config
+        // might reference) mirrors the original manual
+        // `docker run -v $HOME:$HOME` invocation this pipeline's own steller
+        // integration was modelled on.
+        //
+        // The home directory MUST be read at runtime (System.getenv('HOME')), not
+        // hardcoded -- a first version of this hardcoded /home/usuario (the host this
+        // was developed/tested on) and broke immediately on a second host where the
+        // invoking user's home is /home/romualdo: the container only had
+        // /home/usuario mounted, so report.py -- genuinely present on the host --
+        // was invisible inside the container ("No such file or directory") even
+        // though the path Nextflow printed was correct. Also defensively mounts the
+        // config file's and the forest checkout's own directories in case either
+        // ends up outside $HOME on some host (not seen in practice, but the whole
+        // point of this fix is not hardcoding an assumption like that again) --
+        // deduplicated against $HOME (and each other) the same way fastVEP's
+        // bind-mounts are deduplicated in base.config, so two -v flags for the same
+        // host path (a hard "Duplicate mount point" error from Docker) can't happen.
+        String home = System.getenv('HOME') ?: System.getProperty('user.home')
+        List<String> mountDirs = [home]
+        [config.parentFile, reportPy.parentFile].each { dir ->
+            String path = dir.absolutePath
+            boolean covered = mountDirs.any { path == it || path.startsWith(it + File.separator) }
+            if (!covered) {
+                mountDirs << path
+            }
+        }
+        String mountFlags = mountDirs.collect { "-v ${it}:${it}" }.join(' ')
+
         String cmd = "docker run --rm -p ${port}:${port} " +
-            "-v /home/usuario:/home/usuario " +
+            "${mountFlags} " +
             "--user \$(id -u):\$(id -g) " +
             "romualdomf/forest-report:latest " +
             "python3 ${reportPy.absolutePath} ${config.absolutePath}"
