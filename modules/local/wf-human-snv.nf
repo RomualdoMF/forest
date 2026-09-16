@@ -643,30 +643,6 @@ process phase_gvcf {
         """
 }
 
-process hap {
-    label "happy"
-    input:
-        tuple path("clair.vcf.gz"), path("clair.vcf.gz.tbi")
-        tuple path("ref.fasta"), path("ref.fasta.fai")
-        path "truth.vcf"
-        path "truth.bed"
-    output:
-        path "happy"
-    shell:
-        '''
-        mkdir -p happy
-        /opt/hap.py/bin/hap.py \
-            truth.vcf \
-            clair.vcf.gz \
-            -f truth.bed \
-            -r ref.fasta \
-            -o happy \
-            --engine=vcfeval \
-            --threads=4 \
-            --pass-only
-        '''
-}
-
 
 // See https://github.com/nextflow-io/nextflow/issues/1636
 // This is the only way to publish files from a workflow whilst

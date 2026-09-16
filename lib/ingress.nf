@@ -143,109 +143,6 @@ def add_number_of_reads_to_meta(ch, String input_type_format) {
     return ch
 }
 
-/**
- * Take a map of input arguments, find valid FASTQ inputs, and return a channel
- * with elements of `[metamap, seqs.fastq.gz | null, path-to-fastcat-stats | null]`.
- * The second item is `null` for sample sheet entries without a matching barcode
- * directory. The last item is `null` if `fastcat` was not run (it is only run on
- * directories containing more than one FASTQ file or when `stats: true`).
- *
- * @param arguments: map with arguments containing
- *  - "input": path to either: (i) input FASTQ file, (ii) top-level directory containing
- *     FASTQ files, (iii) directory containing sub-directories which contain FASTQ
- *     files
- *  - "sample": string to name single sample
- *  - "sample_sheet": path to CSV sample sheet
- *  - "analyse_unclassified": boolean. Whether to ingress unclassified (failed to demux) reads
- *  - "analyse_fail": boolean. Whether to ingress any sequence files contained in `*_fail`
- *     directories.
- *  - "stats": boolean whether to write the `fastcat` stats
- *  - "fastcat_extra_args": string with extra arguments to pass to `fastcat`
- *  - "required_sample_types": list of zero or more required sample types expected to be present
- *     in the sample sheet
- *  - "per_read_stats": boolean. If true, output a bgzipped TSV containing a summary
- *     of each read to fastcat_stats/per-read-stats.tsv.gz.
- *  - "fastq_chunk": null or a number of reads to place into chunked FASTQ files
- *  - "allow_multiple_basecall_models": emit data of samples that had more than one
- *     basecall model; if this is `false`, such samples will be emitted as `[meta, null,
- *     null]`
- * @return: channel of `[Map(alias, barcode, type, ...), Path|null, Path|null]`.
- *  The first element is a map with metadata, the second is the path to the
- *  `.fastq.gz` file with the (potentially concatenated) sequences and the third is
- *  the path to the directory with the `fastcat` statistics. The second element is
- *  `null` for sample sheet entries for which no corresponding barcode directory was
- *  found. The third element is `null` if `fastcat` was not run.
- */
-def fastq_ingress(Map arguments)
-{
-    // check arguments
-    Map margs = parse_arguments(
-        "fastq_ingress", arguments,
-        [
-            "fastcat_extra_args": "",
-            "fastq_chunk": null,
-        ]
-    )
-    margs["fastq_chunk"] ?= 0  // cant pass null through channel
-
-    ArrayList fq_extensions = [".fastq", ".fastq.gz", ".fq", ".fq.gz"]
-
-    def input = get_valid_inputs(margs, fq_extensions)
-
-    def ch_result
-    if (margs.stats) {
-        // run fastcat regardless of input type
-        ch_result = fastcat(input.files.mix(input.dirs), margs, "FASTQ")
-    } else {
-        // run `fastcat` only on directories and rename / compress single files
-        ch_dir = fastcat(input.dirs, margs, "FASTQ")
-            .map { meta, path, stats -> [meta, path] }
-        def ch_file
-        if (margs["fastq_chunk"] > 0) {
-            ch_file = split_fq_file(input.files, margs["fastq_chunk"])
-        } else {
-            ch_file = move_or_compress_fq_file(input.files)
-        }
-        ch_result = ch_dir 
-            | mix(ch_file) 
-            | map { meta, path -> [meta, path, null] }
-    }
-    // TODO: xam_ingress mixes in a .no_files channel here. Do we need to do the same? 
-
-    // The above may have returned a channel with multiple fastqs if chunking
-    // is enabled. Flatten this and add a groupKey to meta information which
-    // states the number of sibling files. This can be later used as the key
-    // for .groupTuple() on a channel in order to get all results for a sample
-    // We don't decorate "alias" with a count because that messes up downstream
-    // serialisation.
-    // Mix in the missing files from the sample sheet
-    // Add in a unique key for every emission
-    def ch_spread_result = ch_result
-        .mix (input.missing.map { meta, files -> [meta, files, null] })
-        .map { meta, files, stats ->
-            // new `arity: '1..*'` would be nice here
-            files = files instanceof List ? files : [files]
-            def new_keys = [
-                "group_key": groupKey(meta["alias"], files.size()),
-                "n_fastq": files.size()]
-            def grp_index = (0..<files.size()).collect()
-            [meta + new_keys, files, grp_index, stats]
-        }
-        .transpose(by: [1, 2])  // spread multiple fastq files into separate emissions
-        .map { meta, files, grp_i, stats ->
-            def new_keys = [
-                "group_index": "${meta["alias"]}_${grp_i}"]
-            [meta + new_keys, files, stats]
-        }
-
-    // add number of reads, run IDs, and basecall models to meta
-    def ch_final = add_number_of_reads_to_meta(ch_spread_result, "fastq")
-    ch_final = add_run_IDs_and_basecall_models_to_meta(
-        ch_final, margs.allow_multiple_basecall_models
-    )
-    return ch_final
-}
-
 
 /**
  * Take a map of input arguments, find valid (u)BAM inputs, and return a channel
@@ -389,11 +286,9 @@ def xam_ingress(Map arguments)
             ch_result.to_merge,
             ch_result.to_catsort
         )
-        // TODO: this is largely similar to fastq_ingress, should be refactored
-    
         // input.missing: sample sheet entries without barcode dirs
         def ch_spread_result = input.missing
-            .mix(ch_result.no_files)  // TODO: we don't have this in fastq_ingress?
+            .mix(ch_result.no_files)
             .map { meta, files -> [meta, files, null] }
             .mix(
                 fastcat(ch_to_fastq, margs, "BAM")
@@ -789,57 +684,8 @@ process bamstats {
 }
 
 
-process move_or_compress_fq_file {
-    label "ingress"
-    label "wf_common"
-    cpus 1
-    memory "2 GB"
-    input:
-        // don't stage `input` with a literal because we check the file extension
-        tuple val(meta), path(input)
-    output:
-        tuple val(meta), path("seqs.fastq.gz")
-    script:
-        String out = "seqs.fastq.gz"
-        if (input.name.endsWith('.gz')) {
-            // we need to take into account that the file could already be named
-            // "seqs.fastq.gz" in which case `mv` would fail
-            """
-            [ "$input" == "$out" ] || mv "$input" $out
-            """
-        } else {
-            """
-            cat "$input" | bgzip -@ $task.cpus > $out
-            """
-        }
-}
-
-
-process split_fq_file {
-    label "ingress"
-    label "wf_common"
-    cpus 1
-    memory "2 GB"
-    input:
-        // don't stage `input` with a literal because we check the file extension
-        tuple val(meta), path(input)
-        val fastq_chunk
-    output:
-        tuple val(meta), path("fastq_chunks/*.fastq.gz")  // TODO: change this to use new arity: '1..*'
-    script:
-        String cat = input.name.endsWith('.gz') ? "zcat" : "cat"
-        Integer lines_per_chunk = fastq_chunk * 4
-        """
-        mkdir fastq_chunks
-        $cat "$input" \
-            | split -l $lines_per_chunk -d --additional-suffix=.fastq.gz --filter='bgzip \
-            > \$FILE' - fastq_chunks/seqs_
-        """
-}
-
-
 /**
- * Parse input arguments for `fastq_ingress` or `xam_ingress`.
+ * Parse input arguments for `xam_ingress`.
  *
  * @param func_name: String name to set on `ArgumentParser`. Recommended to use the name of the 
     function calling `parse_arguments`.
@@ -879,7 +725,7 @@ Map parse_arguments(String func_name, Map arguments, Map extra_kwargs=[:]) {
  * target file, a top-level directory with target files, or a directory containing
  * sub-directories (usually barcodes) with target files.
  *
- * @param margs: parsed arguments (see `fastq_ingress` and `xam_ingress` for details)
+ * @param margs: parsed arguments (see `xam_ingress` for details)
  * @param extensions: list of valid extensions for the target file type
  * @return: branched channel with branches `missing`, `dir`, and `files`
 */

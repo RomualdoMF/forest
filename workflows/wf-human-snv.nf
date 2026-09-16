@@ -14,7 +14,6 @@ include {
     post_clair_contig_haplotag;
     aggregate_all_variants;
     phase_gvcf;
-    hap;
     getVersions;
     makeReport;
     post_clair_phase_contig;
