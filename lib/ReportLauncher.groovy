@@ -25,8 +25,36 @@ class ReportLauncher {
         }
 
         Map<String, String> values = parseConfig(config)
-        String host = values.getOrDefault('host', '127.0.0.1')
+        String displayHost = values.getOrDefault('host', '127.0.0.1')
         String port = values.getOrDefault('port', '8000')
+
+        // report.py binds Uvicorn to whatever `host` says in the config it's given --
+        // fine when running report.py directly on a host without Docker (report.config's
+        // own default, 127.0.0.1, is meant for that case), but fatal here: Docker's
+        // `-p port:port` publishing forwards to the CONTAINER's own external network
+        // interface, never to its internal loopback. A process bound to 127.0.0.1
+        // inside the container is invisible to `-p`, no matter what -- the published
+        // port still accepts the TCP connection (docker-proxy answers), but nothing
+        // ever responds on it, which looks like a hang/reset, not "connection refused"
+        // (confirmed for real: curl against a real report.config with the default
+        // host=127.0.0.1 connected but never got a response; forcing the in-container
+        // bind to 0.0.0.0 and retrying immediately fixed it). So the config actually
+        // fed to report.py inside the container always forces host=0.0.0.0, regardless
+        // of what the user's own report.config says -- via a throwaway copy, so the
+        // user's file on disk is never rewritten. The user-facing URL printed below
+        // still uses the ORIGINAL host value (0.0.0.0 isn't something you type into a
+        // browser).
+        File dockerConfig = File.createTempFile('report-docker-', '.config', config.parentFile)
+        dockerConfig.deleteOnExit()
+        dockerConfig.withWriter { w ->
+            config.eachLine { line ->
+                if (line.trim().replaceAll(/\s+/, '').startsWith('host=')) {
+                    w.writeLine('host = 0.0.0.0')
+                } else {
+                    w.writeLine(line)
+                }
+            }
+        }
 
         // report.config's own paths (written by ReportConfig.generate, or hand-edited
         // in interactive_report/report.config) are always absolute paths under the
@@ -66,9 +94,9 @@ class ReportLauncher {
             "${mountFlags} " +
             "--user \$(id -u):\$(id -g) " +
             "romualdomf/forest-report:latest " +
-            "python3 ${reportPy.absolutePath} ${config.absolutePath}"
+            "python3 ${reportPy.absolutePath} ${dockerConfig.absolutePath}"
 
-        println "Launching interactive_report/report.py -- http://${host}:${port}"
+        println "Launching interactive_report/report.py -- http://${displayHost}:${port}"
         println "(Ctrl+C stops the report server and exits.)"
 
         ProcessBuilder pb = new ProcessBuilder(['bash', '-c', cmd])
@@ -76,6 +104,7 @@ class ReportLauncher {
         pb.inheritIO()
         Process proc = pb.start()
         int exitCode = proc.waitFor()
+        dockerConfig.delete()
         System.exit(exitCode)
     }
 
